@@ -1,3 +1,0 @@
-<div style="padding:40px; text-align:center; color:#aaa; font-size:18px;">
-  Coming soon...
-</div>
