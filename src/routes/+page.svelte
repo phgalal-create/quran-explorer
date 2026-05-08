@@ -1,137 +1,131 @@
 <script>
-  import { page } from '$app/stores';
-  let { children } = $props();
+  import { supabase } from '$lib/supabase.js';
+  import { SURAHS } from '$lib/surahs.js';
 
-  const navItems = [
-    { href: '/',        ar: 'تصفح',  en: 'Browse'     },
-    { href: '/search',  ar: 'بحث',   en: 'Search'     },
-    { href: '/roots',   ar: 'جذور',  en: 'Roots'      },
-    { href: '/filter',  ar: 'تصفية', en: 'Filter'     },
-    { href: '/table',   ar: 'جدول',  en: 'Table'      },
-    { href: '/stats',   ar: 'إحصاء', en: 'Statistics' },
-  ];
+  let surahId = $state(1);
+  let verseNum = $state(1);
+  let verseData = $state(null);
+  let tokens = $state([]);
+  let loading = $state(false);
+  let error = $state(null);
+  let selectedMorpheme = $state(null);
+
+  let surah = $derived(SURAHS.find(s => s.id === surahId));
+  let verseCount = $derived(SURAHS.find(s => s.id === surahId)?.v || 1);
+  let verseOptions = $derived(Array.from({ length: verseCount }, (_, i) => i + 1));
+
+  async function loadVerse() {
+    loading = true;
+    error = null;
+    selectedMorpheme = null;
+    tokens = [];
+    verseData = null;
+
+    try {
+      const { data: verse, error: vErr } = await supabase
+        .from('verse')
+        .select('id, verse, text_uthmani')
+        .eq('surah', surahId)
+        .eq('verse', verseNum)
+        .single();
+
+      if (vErr) throw vErr;
+      verseData = verse;
+
+      const { data: toks, error: tErr } = await supabase
+        .from('token')
+        .select('id, token_pos, text_uthmani')
+        .eq('verse_id', verse.id)
+        .order('token_pos');
+
+      if (tErr) throw tErr;
+
+      const tokenIds = toks.map(t => t.id);
+
+      const { data: morphemes, error: mErr } = await supabase
+        .from('morpheme')
+        .select(`
+          id, morpheme_pos, morpheme_u, morpheme_s, token_id,
+          analysis (
+            id, morpheme_type, pos_code, f1_type, n_type,
+            person, gender, number, grammatical_case, definiteness,
+            v_aspect, v_mood, v_voice, v_form, sp,
+            root ( root_text, root_type ),
+            lemmas:analysis_lemma ( rank, lemma ( arabic_text ) ),
+            patterns:analysis_pattern ( rank, pattern ( arabic_text ) )
+          )
+        `)
+        .in('token_id', tokenIds)
+        .order('morpheme_pos');
+
+      if (mErr) throw mErr;
+
+      const morphByToken = {};
+      morphemes.forEach(m => {
+        if (!morphByToken[m.token_id]) morphByToken[m.token_id] = [];
+        morphByToken[m.token_id].push(m);
+      });
+
+      tokens = toks.map(t => ({ ...t, morphemes: morphByToken[t.id] || [] }));
+
+    } catch (e) {
+      error = e.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  function onSurahChange() {
+    verseNum = 1;
+    loadVerse();
+  }
+
+  function prevVerse() { if (verseNum > 1) { verseNum--; loadVerse(); } }
+  function nextVerse() { if (verseNum < verseCount) { verseNum++; loadVerse(); } }
+
+  function selectMorpheme(m) {
+    selectedMorpheme = selectedMorpheme?.id === m.id ? null : m;
+  }
+
+  function getDetailRows(m) {
+    const a = m.analysis?.[0];
+    if (!a) return [];
+    const lemmas = a.lemmas?.map(l => l.lemma?.arabic_text).filter(Boolean).join(' / ') || null;
+    const patterns = a.patterns?.map(p => p.pattern?.arabic_text).filter(Boolean).join(' / ') || null;
+    return [
+      ['Type', a.morpheme_type],
+      ['POS', a.pos_code],
+      ['Root', a.root?.root_text, true],
+      ['Lemma', lemmas, true],
+      ['Pattern', patterns, true],
+      ['Person', a.person],
+      ['Gender', a.gender],
+      ['Number', a.number],
+      ['Case', a.grammatical_case],
+      ['Definiteness', a.definiteness],
+      ['Aspect', a.v_aspect],
+      ['Mood', a.v_mood],
+      ['Voice', a.v_voice],
+      ['Verb Form', a.v_form ? `Form ${a.v_form}` : null],
+      ['Noun Type', a.n_type],
+      ['F1 Type', a.f1_type],
+    ].filter(([, val]) => val != null && val !== '');
+  }
+
+  loadVerse();
 </script>
 
-<svelte:head>
-  <title>Quran Explorer</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Scheherazade+New:wght@400;700&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
-</svelte:head>
-
-<nav>
-  <div class="brand">
-    <span class="brand-ar">القرآن الكريم</span>
-    <span class="brand-en">QURAN EXPLORER</span>
-  </div>
-  <div class="links">
-    {#each navItems as item}
-      <a href={item.href} class:active={$page.url.pathname === item.href}>
-        <span class="link-ar">{item.ar}</span>
-        <span class="link-en">{item.en}</span>
-      </a>
-    {/each}
-  </div>
-</nav>
-
-<main>
-  {@render children()}
-</main>
-
-<style>
-  :global(*) { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :global(:root) {
-    --ink: #1a1208;
-    --parchment: #f7f0e3;
-    --parchment-dark: #ede3cc;
-    --gold: #c8922a;
-    --gold-light: #e8b84b;
-    --gold-muted: #a07820;
-    --rust: #8b3a1a;
-    --teal: #1a5c5c;
-    --divider: #d4b896;
-    --text-muted: #6b5a3e;
-    --shadow: rgba(26,18,8,0.15);
-  }
-
-  :global(body) {
-    background: var(--parchment);
-    color: var(--ink);
-    font-family: 'EB Garamond', Georgia, serif;
-    min-height: 100vh;
-  }
-
-  :global(.arabic) {
-    font-family: 'Scheherazade New', 'Amiri', serif;
-    direction: rtl;
-    unicode-bidi: embed;
-  }
-
-  :global(::-webkit-scrollbar) { width: 6px; }
-  :global(::-webkit-scrollbar-track) { background: var(--parchment-dark); }
-  :global(::-webkit-scrollbar-thumb) { background: var(--divider); border-radius: 3px; }
-
-  nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 2rem;
-    height: 64px;
-    background: var(--ink);
-    border-bottom: 2px solid var(--gold);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    direction: ltr;
-  }
-
-  .brand { display: flex; flex-direction: column; line-height: 1.1; }
-
-  .brand-ar {
-    font-family: 'Scheherazade New', serif;
-    color: var(--gold-light);
-    font-size: 1.1rem;
-    direction: rtl;
-  }
-
-  .brand-en {
-    font-family: 'Cinzel', serif;
-    color: var(--gold);
-    font-size: 0.65rem;
-    letter-spacing: 0.18em;
-  }
-
-  .links { display: flex; gap: 0.25rem; }
-
-  a {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0.4rem 0.85rem;
-    border-radius: 4px;
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition: background 0.15s;
-  }
-
-  a:hover { background: rgba(200,146,42,0.12); border-color: rgba(200,146,42,0.3); }
-
-  a.active { background: rgba(200,146,42,0.18); border-color: var(--gold-muted); }
-
-  .link-ar {
-    font-family: 'Scheherazade New', serif;
-    color: var(--parchment);
-    font-size: 1rem;
-  }
-
-  .link-en {
-    color: var(--gold-muted);
-    font-size: 0.6rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  a.active .link-ar { color: var(--gold-light); }
-  a.active .link-en { color: var(--gold); }
-</style>
+<div class="page">
+  <div class="topbar">
+    <div class="topbar-left">
+      <label class="ctrl-label">
+        <span class="arabic">السورة</span>
+        <select bind:value={surahId} onchange={onSurahChange}>
+          {#each SURAHS as s}
+            <option value={s.id}>{s.id}. {s.ar} — {s.en}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="ctrl-label">
+        <span class="arabic">الآية</span>
+        <select bind:value={verseNum} onchange={loadVerse}>
