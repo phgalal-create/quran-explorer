@@ -10,11 +10,6 @@
   let error = $state(null);
   let selectedMorpheme = $state(null);
 
-  $derived.by(() => {
-    const s = SURAHS.find(s => s.id === surahId);
-    return s?.v || 1;
-  });
-
   let verseCount = $derived(SURAHS.find(s => s.id === surahId)?.v || 1);
   let surah = $derived(SURAHS.find(s => s.id === surahId));
   let verseOptions = $derived(Array.from({ length: verseCount }, (_, i) => i + 1));
