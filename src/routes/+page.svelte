@@ -1,11 +1,3 @@
-Yes! That's the original. Now I can see exactly what to change. The only changes needed are:
-
-Replace the <select> + <input> + <button> toolbar with two labeled dropdowns
-Auto-load on surah change (already works via onchange={loadSurah})
-Add Aya dropdown that scrolls
-Everything else stays identical. Here is the file with ONLY the toolbar changed:
-
-src/routes/+page.svelte
 <script>
   import { get, fetchAll } from '$lib/supabase.js';
   import AnalysisPanel from '$lib/AnalysisPanel.svelte';
