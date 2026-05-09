@@ -1,370 +1,155 @@
+Yes! That's the original. Now I can see exactly what to change. The only changes needed are:
+
+Replace the <select> + <input> + <button> toolbar with two labeled dropdowns
+Auto-load on surah change (already works via onchange={loadSurah})
+Add Aya dropdown that scrolls
+Everything else stays identical. Here is the file with ONLY the toolbar changed:
+
+src/routes/+page.svelte
 <script>
-  import { onMount } from 'svelte';
-  import { fetchAll } from '$lib/supabase.js';
+  import { get, fetchAll } from '$lib/supabase.js';
   import AnalysisPanel from '$lib/AnalysisPanel.svelte';
 
-  const surahs = [
-    { num: 1,   ar: 'الفاتحة',    en: 'The Opening',     verses: 7   },
-    { num: 2,   ar: 'البقرة',     en: 'The Cow',         verses: 286 },
-    { num: 3,   ar: 'آل عمران',   en: "Ali 'Imran",      verses: 200 },
-    { num: 4,   ar: 'النساء',     en: 'The Women',       verses: 176 },
-    { num: 5,   ar: 'المائدة',    en: 'The Table',       verses: 120 },
-    { num: 6,   ar: 'الأنعام',    en: 'The Cattle',      verses: 165 },
-    { num: 7,   ar: 'الأعراف',    en: 'The Heights',     verses: 206 },
-    { num: 8,   ar: 'الأنفال',    en: 'The Spoils',      verses: 75  },
-    { num: 9,   ar: 'التوبة',     en: 'The Repentance',  verses: 129 },
-    { num: 10,  ar: 'يونس',       en: 'Jonah',           verses: 109 },
-    { num: 11,  ar: 'هود',        en: 'Hud',             verses: 123 },
-    { num: 12,  ar: 'يوسف',       en: 'Joseph',          verses: 111 },
-    { num: 13,  ar: 'الرعد',      en: 'The Thunder',     verses: 43  },
-    { num: 14,  ar: 'إبراهيم',    en: 'Abraham',         verses: 52  },
-    { num: 15,  ar: 'الحجر',      en: 'The Rocky Tract', verses: 99  },
-    { num: 16,  ar: 'النحل',      en: 'The Bee',         verses: 128 },
-    { num: 17,  ar: 'الإسراء',    en: 'The Night Journey',verses: 111},
-    { num: 18,  ar: 'الكهف',      en: 'The Cave',        verses: 110 },
-    { num: 19,  ar: 'مريم',       en: 'Mary',            verses: 98  },
-    { num: 20,  ar: 'طه',         en: 'Ta-Ha',           verses: 135 },
-    { num: 21,  ar: 'الأنبياء',   en: 'The Prophets',    verses: 112 },
-    { num: 22,  ar: 'الحج',       en: 'The Pilgrimage',  verses: 78  },
-    { num: 23,  ar: 'المؤمنون',   en: 'The Believers',   verses: 118 },
-    { num: 24,  ar: 'النور',      en: 'The Light',       verses: 64  },
-    { num: 25,  ar: 'الفرقان',    en: 'The Criterion',   verses: 77  },
-    { num: 26,  ar: 'الشعراء',    en: 'The Poets',       verses: 227 },
-    { num: 27,  ar: 'النمل',      en: 'The Ant',         verses: 93  },
-    { num: 28,  ar: 'القصص',      en: 'The Stories',     verses: 88  },
-    { num: 29,  ar: 'العنكبوت',   en: 'The Spider',      verses: 69  },
-    { num: 30,  ar: 'الروم',      en: 'The Romans',      verses: 60  },
-    { num: 31,  ar: 'لقمان',      en: 'Luqman',          verses: 34  },
-    { num: 32,  ar: 'السجدة',     en: 'The Prostration', verses: 30  },
-    { num: 33,  ar: 'الأحزاب',    en: 'The Confederates',verses: 73  },
-    { num: 34,  ar: 'سبأ',        en: 'Sheba',           verses: 54  },
-    { num: 35,  ar: 'فاطر',       en: 'The Originator',  verses: 45  },
-    { num: 36,  ar: 'يس',         en: 'Ya-Sin',          verses: 83  },
-    { num: 37,  ar: 'الصافات',    en: 'Those in Ranks',  verses: 182 },
-    { num: 38,  ar: 'ص',          en: 'Sad',             verses: 88  },
-    { num: 39,  ar: 'الزمر',      en: 'The Groups',      verses: 75  },
-    { num: 40,  ar: 'غافر',       en: 'The Forgiver',    verses: 85  },
-    { num: 41,  ar: 'فصلت',       en: 'Explained',       verses: 54  },
-    { num: 42,  ar: 'الشورى',     en: 'The Consultation',verses: 53  },
-    { num: 43,  ar: 'الزخرف',     en: 'The Gold',        verses: 89  },
-    { num: 44,  ar: 'الدخان',     en: 'The Smoke',       verses: 59  },
-    { num: 45,  ar: 'الجاثية',    en: 'The Crouching',   verses: 37  },
-    { num: 46,  ar: 'الأحقاف',    en: 'The Dunes',       verses: 35  },
-    { num: 47,  ar: 'محمد',       en: 'Muhammad',        verses: 38  },
-    { num: 48,  ar: 'الفتح',      en: 'The Victory',     verses: 29  },
-    { num: 49,  ar: 'الحجرات',    en: 'The Rooms',       verses: 18  },
-    { num: 50,  ar: 'ق',          en: 'Qaf',             verses: 45  },
-    { num: 51,  ar: 'الذاريات',   en: 'The Winds',       verses: 60  },
-    { num: 52,  ar: 'الطور',      en: 'The Mount',       verses: 49  },
-    { num: 53,  ar: 'النجم',      en: 'The Star',        verses: 62  },
-    { num: 54,  ar: 'القمر',      en: 'The Moon',        verses: 55  },
-    { num: 55,  ar: 'الرحمن',     en: 'The Beneficent',  verses: 78  },
-    { num: 56,  ar: 'الواقعة',    en: 'The Inevitable',  verses: 96  },
-    { num: 57,  ar: 'الحديد',     en: 'The Iron',        verses: 29  },
-    { num: 58,  ar: 'المجادلة',   en: 'The Pleading',    verses: 22  },
-    { num: 59,  ar: 'الحشر',      en: 'The Exile',       verses: 24  },
-    { num: 60,  ar: 'الممتحنة',   en: 'She Examined',    verses: 13  },
-    { num: 61,  ar: 'الصف',       en: 'The Ranks',       verses: 14  },
-    { num: 62,  ar: 'الجمعة',     en: 'Friday',          verses: 11  },
-    { num: 63,  ar: 'المنافقون',  en: 'The Hypocrites',  verses: 11  },
-    { num: 64,  ar: 'التغابن',    en: 'Disillusion',     verses: 18  },
-    { num: 65,  ar: 'الطلاق',     en: 'Divorce',         verses: 12  },
-    { num: 66,  ar: 'التحريم',    en: 'The Prohibition', verses: 12  },
-    { num: 67,  ar: 'الملك',      en: 'The Sovereignty', verses: 30  },
-    { num: 68,  ar: 'القلم',      en: 'The Pen',         verses: 52  },
-    { num: 69,  ar: 'الحاقة',     en: 'The Reality',     verses: 52  },
-    { num: 70,  ar: 'المعارج',    en: 'The Stairways',   verses: 44  },
-    { num: 71,  ar: 'نوح',        en: 'Noah',            verses: 28  },
-    { num: 72,  ar: 'الجن',       en: 'The Jinn',        verses: 28  },
-    { num: 73,  ar: 'المزمل',     en: 'The Enshrouded',  verses: 20  },
-    { num: 74,  ar: 'المدثر',     en: 'The Cloaked',     verses: 56  },
-    { num: 75,  ar: 'القيامة',    en: 'The Resurrection',verses: 40  },
-    { num: 76,  ar: 'الإنسان',    en: 'Man',             verses: 31  },
-    { num: 77,  ar: 'المرسلات',   en: 'The Emissaries',  verses: 50  },
-    { num: 78,  ar: 'النبأ',      en: 'The Tidings',     verses: 40  },
-    { num: 79,  ar: 'النازعات',   en: 'Those Who Drag',  verses: 46  },
-    { num: 80,  ar: 'عبس',        en: 'He Frowned',      verses: 42  },
-    { num: 81,  ar: 'التكوير',    en: 'The Overthrowing',verses: 29  },
-    { num: 82,  ar: 'الانفطار',   en: 'The Cleaving',    verses: 19  },
-    { num: 83,  ar: 'المطففين',   en: 'The Defrauding',  verses: 36  },
-    { num: 84,  ar: 'الانشقاق',   en: 'The Sundering',   verses: 25  },
-    { num: 85,  ar: 'البروج',     en: 'The Constellations',verses: 22},
-    { num: 86,  ar: 'الطارق',     en: 'The Morning Star',verses: 17  },
-    { num: 87,  ar: 'الأعلى',     en: 'The Most High',   verses: 19  },
-    { num: 88,  ar: 'الغاشية',    en: 'The Overwhelming',verses: 26  },
-    { num: 89,  ar: 'الفجر',      en: 'The Dawn',        verses: 30  },
-    { num: 90,  ar: 'البلد',      en: 'The City',        verses: 20  },
-    { num: 91,  ar: 'الشمس',      en: 'The Sun',         verses: 15  },
-    { num: 92,  ar: 'الليل',      en: 'The Night',       verses: 21  },
-    { num: 93,  ar: 'الضحى',      en: 'The Morning',     verses: 11  },
-    { num: 94,  ar: 'الشرح',      en: 'The Relief',      verses: 8   },
-    { num: 95,  ar: 'التين',      en: 'The Fig',         verses: 8   },
-    { num: 96,  ar: 'العلق',      en: 'The Clot',        verses: 19  },
-    { num: 97,  ar: 'القدر',      en: 'The Power',       verses: 5   },
-    { num: 98,  ar: 'البينة',     en: 'The Evidence',    verses: 8   },
-    { num: 99,  ar: 'الزلزلة',    en: 'The Earthquake',  verses: 8   },
-    { num: 100, ar: 'العاديات',   en: 'The Courser',     verses: 11  },
-    { num: 101, ar: 'القارعة',    en: 'The Calamity',    verses: 11  },
-    { num: 102, ar: 'التكاثر',    en: 'The Rivalry',     verses: 8   },
-    { num: 103, ar: 'العصر',      en: 'The Time',        verses: 3   },
-    { num: 104, ar: 'الهمزة',     en: 'The Traducer',    verses: 9   },
-    { num: 105, ar: 'الفيل',      en: 'The Elephant',    verses: 5   },
-    { num: 106, ar: 'قريش',       en: 'Quraysh',         verses: 4   },
-    { num: 107, ar: 'الماعون',    en: 'The Kindnesses',  verses: 7   },
-    { num: 108, ar: 'الكوثر',     en: 'Abundance',       verses: 3   },
-    { num: 109, ar: 'الكافرون',   en: 'The Disbelievers',verses: 6   },
-    { num: 110, ar: 'النصر',      en: 'The Support',     verses: 3   },
-    { num: 111, ar: 'المسد',      en: 'The Palm Fiber',  verses: 5   },
-    { num: 112, ar: 'الإخلاص',    en: 'Sincerity',       verses: 4   },
-    { num: 113, ar: 'الفلق',      en: 'The Daybreak',    verses: 5   },
-    { num: 114, ar: 'الناس',      en: 'Mankind',         verses: 6   },
-  ];
+  let surahs = $state([]);
+  let selectedSurah = $state('');
+  let verses = $state([]);
+  let tokensByVerse = $state({});
+  let loadingVerses = $state(false);
+  let selectedTokenId = $state(null);
+  let activeTokenId = $state(null);
+  let selectedAya = $state(1);
 
-  let selectedSurah = 1;
-  let selectedAya   = 1;
-  let verseData     = [];   // flat morpheme rows grouped into verses
-  let loading       = false;
-  let error         = null;
-  let selectedMorpheme = null;
+  let surahInfo = $derived(surahs.find(s => s.id == selectedSurah));
+  let ayaCount = $derived(verses.length);
+  let ayaOptions = $derived(Array.from({ length: ayaCount }, (_, i) => i + 1));
 
-  // Aya options re-compute when surah changes
-  $: ayaCount = surahs.find(s => s.num === selectedSurah)?.verses ?? 7;
-  $: ayaOptions = Array.from({ length: ayaCount }, (_, i) => i + 1);
+  $effect(() => { loadSurahs(); });
 
-  // Reload when surah changes
-  $: if (selectedSurah) { selectedAya = 1; loadSurah(); }
+  async function loadSurahs() {
+    surahs = await get('surah', { select: 'id,name_arabic,name_english', order: 'id.asc' });
+  }
 
   async function loadSurah() {
-    loading = true;
-    error   = null;
-    selectedMorpheme = null;
-    verseData = [];
-    try {
-      // 1. Get all verses for this surah
-      const verses = await fetchAll('verse', {
-        select: 'id,verse',
-        surah:  `eq.${selectedSurah}`,
-        order:  'verse'
-      });
-
-      // 2. For each verse, get tokens → morphemes
-      const result = [];
-      for (const v of verses) {
-        const tokens = await fetchAll('token', {
-          select:   'id,token_pos,morpheme(id,morpheme_pos,morpheme_u,morpheme_s,max_morphemes)',
-          verse_id: `eq.${v.id}`,
-          order:    'token_pos'
-        });
-        result.push({
-          verse:  v.verse,
-          tokens: tokens.map(t => ({
-            token_pos: t.token_pos,
-            morphemes: (t.morpheme || []).sort((a,b) => a.morpheme_pos - b.morpheme_pos)
-          }))
-        });
-      }
-      verseData = result;
-    } catch(e) {
-      error = e.message;
-    } finally {
-      loading = false;
-    }
+    if (!selectedSurah) return;
+    loadingVerses = true;
+    selectedTokenId = null;
+    activeTokenId = null;
+    tokensByVerse = {};
+    selectedAya = 1;
+    verses = await fetchAll('verse', {
+      select: 'id,verse,text_uthmani',
+      surah: `eq.${selectedSurah}`,
+      order: 'verse.asc'
+    });
+    const verseIds = verses.map(v => v.id).join(',');
+    const tokens = await fetchAll('token', {
+      select: 'id,verse_id,token_pos,text_uthmani',
+      verse_id: `in.(${verseIds})`,
+      order: 'verse_id.asc,token_pos.asc'
+    });
+    const byVerse = {};
+    tokens.forEach(t => {
+      if (!byVerse[t.verse_id]) byVerse[t.verse_id] = [];
+      byVerse[t.verse_id].push(t);
+    });
+    tokensByVerse = byVerse;
+    loadingVerses = false;
   }
 
-  function selectMorpheme(m) { selectedMorpheme = m; }
+  function selectToken(tokenId) {
+    selectedTokenId = tokenId;
+    activeTokenId = tokenId;
+  }
 
-  function goToAya(n) {
+  function jumpToAya(n) {
     selectedAya = n;
-    const el = document.getElementById(`v${n}`);
+    const el = document.getElementById(`verse-${n}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
-  onMount(() => loadSurah());
 </script>
 
-<!-- ═══════════════════════════ LAYOUT ═══════════════════════════ -->
-<div class="app">
+<div class="layout">
+  <div class="reading-panel">
 
-  <!-- TOP NAV -->
-  <header class="topnav">
-    <span class="site-title">Quran Explorer — القارئ والمحرر الصرفي</span>
-    <div class="nav-controls">
-      <label class="nav-label">
+    <div class="toolbar">
+      <label class="toolbar-label">
         سورة Surah
-        <select bind:value={selectedSurah}>
+        <select bind:value={selectedSurah} onchange={loadSurah}>
+          <option value="">-- Select Surah --</option>
           {#each surahs as s}
-            <option value={s.num}>{s.num}. {s.ar} — {s.en}</option>
+            <option value={s.id}>{s.id}. {s.name_arabic} — {s.name_english}</option>
           {/each}
         </select>
       </label>
 
-      <label class="nav-label">
-        Verse آية
-        <select bind:value={selectedAya} on:change={() => goToAya(selectedAya)}>
+      <label class="toolbar-label">
+        آية Verse
+        <select
+          bind:value={selectedAya}
+          onchange={() => jumpToAya(selectedAya)}
+          disabled={ayaCount === 0}
+        >
           {#each ayaOptions as n}
             <option value={n}>{n}</option>
           {/each}
         </select>
       </label>
     </div>
-  </header>
 
-  <!-- BODY: analysis panel + quran text -->
-  <div class="body">
-
-    <!-- LEFT: Analysis Panel -->
-    <aside class="panel">
-      <AnalysisPanel morpheme={selectedMorpheme} />
-    </aside>
-
-    <!-- RIGHT: Quran text -->
-    <main class="quran-pane">
-      {#if loading}
-        <div class="msg">Loading…</div>
-      {:else if error}
-        <div class="msg err">{error}</div>
+    <div class="content">
+      {#if !selectedSurah}
+        <div class="empty">اختر سورة — Select a surah</div>
+      {:else if loadingVerses}
+        <div class="empty">جاري التحميل...</div>
       {:else}
-        {#each verseData as v}
-          <div class="verse-row" id="v{v.verse}">
-            <span class="vnum">{selectedSurah}:{v.verse}</span>
-            <span class="vtext" dir="rtl">{#each v.tokens as tok}{#each tok.morphemes as m}<span
-                  class="mph"
-                  class:active={selectedMorpheme?.id === m.id}
-                  on:click={() => selectMorpheme(m)}
-                  role="button"
-                  tabindex="0"
-                  on:keydown={e => e.key==='Enter' && selectMorpheme(m)}
-                >{m.morpheme_u}</span>{/each} {/each}<span class="vend">﴿{v.verse}﴾</span></span>
+        <div class="surah-title">
+          <div class="arabic-name">{surahInfo?.name_arabic}</div>
+          <div class="english-name">{surahInfo?.name_english}</div>
+        </div>
+        {#if selectedSurah != 1 && selectedSurah != 9}
+          <div class="bismillah">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
+        {/if}
+        {#each verses as v}
+          <div class="verse-block" id="verse-{v.verse}">
+            <div class="verse-num">{selectedSurah}:{v.verse}</div>
+            <div class="verse-text">
+              {#each (tokensByVerse[v.id] || []) as t}
+                <button class="word-btn" class:active={activeTokenId===t.id} onclick={()=>selectToken(t.id)}>
+                  {t.text_uthmani}
+                </button>
+              {/each}
+              <span class="verse-marker">﴿{v.verse}﴾</span>
+            </div>
           </div>
         {/each}
       {/if}
-    </main>
+    </div>
+  </div>
 
+  <div class="analysis-panel">
+    <div class="panel-header">التحليل الصرفي — Morphological Analysis</div>
+    <AnalysisPanel tokenId={selectedTokenId} />
   </div>
 </div>
 
-<!-- ═══════════════════════════ STYLES ═══════════════════════════ -->
 <style>
-  :global(body) { margin: 0; padding: 0; font-family: sans-serif; }
-
-  .app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  /* ── Top nav ── */
-  .topnav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #14532d;
-    color: white;
-    padding: 0 1.2rem;
-    height: 48px;
-    flex-shrink: 0;
-  }
-
-  .site-title {
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-
-  .nav-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .nav-label {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-    color: #d1fae5;
-  }
-
-  .nav-label select {
-    background: #166534;
-    color: white;
-    border: 1px solid #4ade80;
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.85rem;
-    cursor: pointer;
-    max-width: 240px;
-  }
-
-  /* ── Body ── */
-  .body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  /* ── Analysis panel ── */
-  .panel {
-    width: 420px;
-    flex-shrink: 0;
-    border-right: 2px solid #e2e8f0;
-    overflow-y: auto;
-    background: white;
-  }
-
-  /* ── Quran pane ── */
-  .quran-pane {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1.5rem 2.5rem;
-    background: #f9fafb;
-  }
-
-  .msg { text-align:center; padding:3rem; color:#64748b; }
-  .err { color:#ef4444; }
-
-  /* ── Verse row ── */
-  .verse-row {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    padding: 0.9rem 0;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .vnum {
-    font-size: 0.78rem;
-    color: #94a3b8;
-    flex-shrink: 0;
-    width: 3rem;
-    text-align: right;
-  }
-
-  .vtext {
-    flex: 1;
-    font-family: 'Amiri', 'Scheherazade New', serif;
-    font-size: 1.65rem;
-    line-height: 2.4;
-    text-align: right;
-    /* no whitespace between inline spans = connected ligatures */
-  }
-
-  /* morpheme spans — NO whitespace between them in template */
-  .mph {
-    display: inline;
-    cursor: pointer;
-    border-radius: 3px;
-    padding: 0 1px;
-    transition: background 0.1s;
-  }
-  .mph:hover  { background: #dbeafe; }
-  .mph.active { background: #15803d; color: white; }
-
-  .vend {
-    color: #92400e;
-    font-size: 1.3rem;
-    margin-right: 0.3rem;
-    font-family: 'Amiri', serif;
-  }
+.layout{display:flex;height:100%;overflow:hidden;}
+.reading-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fafafa;}
+.toolbar{display:flex;gap:16px;align-items:center;padding:10px 16px;background:white;border-bottom:1px solid #ddd;flex-shrink:0;}
+.toolbar-label{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;font-weight:500;}
+.toolbar-label select{border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:14px;min-width:200px;cursor:pointer;}
+.content{flex:1;overflow-y:auto;padding:20px;}
+.empty{text-align:center;color:#bbb;margin-top:80px;font-size:18px;font-family:'Traditional Arabic',Arial,sans-serif;}
+.surah-title{text-align:center;margin-bottom:20px;}
+.arabic-name{font-size:28px;font-family:'Traditional Arabic',Arial,sans-serif;color:#1a472a;direction:rtl;}
+.english-name{font-size:14px;color:#888;margin-top:4px;}
+.bismillah{text-align:center;font-size:24px;font-family:'Traditional Arabic',Arial,sans-serif;color:#333;margin-bottom:16px;direction:rtl;}
+.verse-block{background:white;border-radius:8px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
+.verse-num{font-size:11px;color:#aaa;margin-bottom:8px;direction:ltr;}
+.verse-text{direction:rtl;line-height:2.6;font-size:24px;font-family:'Traditional Arabic',Arial,sans-serif;text-align:right;}
+.word-btn{display:inline;background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;font-size:inherit;font-family:inherit;color:#222;transition:background 0.15s;}
+.word-btn:hover{background:#e8f5e9;color:#1a472a;}.word-btn.active{background:#1a472a;color:white;}
+.verse-marker{color:#1a472a;font-size:18px;margin-right:6px;}
+.analysis-panel{width:400px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid #ddd;overflow:hidden;}
+.panel-header{background:#1a472a;color:white;padding:12px 16px;font-size:15px;font-family:'Traditional Arabic',Arial,sans-serif;flex-shrink:0;}
 </style>
