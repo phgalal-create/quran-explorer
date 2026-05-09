@@ -1,6 +1,3 @@
-The original code uses $props() and $state() (Svelte 5 runes) but the import path needs fixing. The only change needed is line 2: './supabase.js' → '$lib/supabase.js'. That's it — everything else is identical:
-
-src/lib/AnalysisPanel.svelte
 <script>
   import { get, post, patch, del } from '$lib/supabase.js';
   let { tokenId } = $props();
