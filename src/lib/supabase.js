@@ -16,25 +16,46 @@ function buildUrl(table, params = {}) {
 }
 
 export async function fetchAll(table, params = {}) {
-  const url = buildUrl(table, params);
-  const res = await fetch(url, {
-    headers: {
-      ...baseHeaders,
-      'Prefer': 'count=exact',
-      'Range': '0-9999'
-    }
-  });
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`fetchAll failed [${res.status}]: ${body}`);
+  while (true) {
+    const res = await fetch(buildUrl(table, params), {
+      headers: {
+        ...baseHeaders,
+        'Range': `${from}-${from + pageSize - 1}`,
+        'Range-Unit': 'items',
+        'Prefer': 'count=exact'
+      }
+    });
+
+    // 206 = partial, 200 = full result fits in one page
+    if (!res.ok && res.status !== 206) {
+      const body = await res.text();
+      throw new Error(`fetchAll failed [${res.status}]: ${body}`);
+    }
+
+    const data = await res.json();
+    allRows.push(...data);
+
+    // If we got less than a full page, we're done
+    if (data.length < pageSize) break;
+
+    from += pageSize;
   }
 
-  return res.json();
+  return allRows;
 }
 
 export async function get(table, params = {}) {
-  const res = await fetch(buildUrl(table, params), { headers: baseHeaders });
+  const res = await fetch(buildUrl(table, params), {
+    headers: {
+      ...baseHeaders,
+      'Range': '0-9999',
+      'Range-Unit': 'items'
+    }
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`get failed [${res.status}]: ${body}`);
@@ -55,8 +76,8 @@ export async function post(table, body) {
   return res.json();
 }
 
-export async function patch(table, params = {}, body) {
-  const res = await fetch(buildUrl(table, params), {
+export async function patch(table, id, body) {
+  const res = await fetch(buildUrl(table, { id: `eq.${id}` }), {
     method: 'PATCH',
     headers: { ...baseHeaders, 'Prefer': 'return=representation' },
     body: JSON.stringify(body)
@@ -68,8 +89,8 @@ export async function patch(table, params = {}, body) {
   return res.json();
 }
 
-export async function del(table, params = {}) {
-  const res = await fetch(buildUrl(table, params), {
+export async function del(table, id) {
+  const res = await fetch(buildUrl(table, { id: `eq.${id}` }), {
     method: 'DELETE',
     headers: baseHeaders
   });
