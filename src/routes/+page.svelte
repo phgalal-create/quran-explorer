@@ -137,19 +137,20 @@
     loadVerses();
   }
 
-  async function loadVerses() {
+async function loadVerses() {
     loading = true;
     error = null;
     selectedMorpheme = null;
     try {
       const data = await fetchAll('morpheme', {
-        select: '*',
+        select: 'id,surah,verse,token,morpheme_pos,morpheme_u,morpheme_s',
         surah: `eq.${selectedSurah}`,
         order: 'verse,token,morpheme_pos'
       });
       verses = groupByVerse(data);
     } catch (e) {
       error = e.message;
+      console.error(e);
     } finally {
       loading = false;
     }
