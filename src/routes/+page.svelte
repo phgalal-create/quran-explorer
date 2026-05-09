@@ -142,8 +142,6 @@
     error = null;
     selectedMorpheme = null;
     try {
-      // Query verse table filtered by surah, join down to morphemes
-      // verse → token → morpheme
       const data = await fetchAll('verse', {
         select: 'verse,token(token_pos,text_uthmani,morpheme(id,morpheme_pos,morpheme_u,morpheme_s,max_morphemes))',
         surah: `eq.${selectedSurah}`,
@@ -159,14 +157,12 @@
   }
 
   function buildVerses(data) {
-    // data is array of verse rows, each with nested token array, each token with nested morpheme array
     return data.map(v => ({
       verse: v.verse,
       tokens: (v.token || [])
         .sort((a, b) => a.token_pos - b.token_pos)
         .map(t => ({
           token_pos: t.token_pos,
-          text: t.text_uthmani,
           morphemes: (t.morpheme || []).sort((a, b) => a.morpheme_pos - b.morpheme_pos)
         }))
     }));
@@ -182,13 +178,17 @@
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // Convert Western numerals to Arabic-Indic for verse end marker
+  function toArabicNumerals(n) {
+    return String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  }
+
   onMount(() => {
     loadVerses();
   });
 </script>
 
 <div class="browse-container">
-  <!-- Navigation Bar -->
   <div class="nav-bar">
     <div class="nav-selects">
       <label>
@@ -211,9 +211,8 @@
     </div>
   </div>
 
-  <!-- Main Content -->
   <div class="main-content">
-    <!-- Analysis Panel -->
+    <!-- Analysis Panel — always visible -->
     <div class="panel-left">
       <AnalysisPanel morpheme={selectedMorpheme} />
     </div>
@@ -221,31 +220,24 @@
     <!-- Quran Text -->
     <div class="panel-right">
       {#if loading}
-        <div class="loading">Loading…</div>
+        <div class="status">Loading…</div>
       {:else if error}
-        <div class="error">Error: {error}</div>
+        <div class="status error">Error: {error}</div>
       {:else}
-        {#each verses as v}
-          <div class="verse" id="verse-{v.verse}">
-            <span class="verse-num">{v.verse}</span>
-            <span class="verse-text" dir="rtl">
-              {#each v.tokens as token}
-                <span class="token">
-                  {#each token.morphemes as morpheme}
-                    <span
-                      class="morpheme"
-                      class:selected={selectedMorpheme?.id === morpheme.id}
-                      on:click={() => selectMorpheme(morpheme)}
-                      role="button"
-                      tabindex="0"
-                      on:keydown={e => e.key === 'Enter' && selectMorpheme(morpheme)}
-                    >{morpheme.morpheme_u}</span>
-                  {/each}
-                </span>
-              {/each}
+        <div class="quran-text" dir="rtl">
+          {#each verses as v}
+            <span id="verse-{v.verse}" class="verse-block">
+              {#each v.tokens as token}{#each token.morphemes as morpheme}<span
+                  class="morpheme"
+                  class:selected={selectedMorpheme?.id === morpheme.id}
+                  on:click={() => selectMorpheme(morpheme)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={e => e.key === 'Enter' && selectMorpheme(morpheme)}
+                >{morpheme.morpheme_u}</span>{/each} {/each}<span class="verse-end">﴿{toArabicNumerals(v.verse)}﴾</span>
             </span>
-          </div>
-        {/each}
+          {/each}
+        </div>
       {/if}
     </div>
   </div>
@@ -262,7 +254,6 @@
   .nav-bar {
     display: flex;
     align-items: center;
-    gap: 1rem;
     padding: 0.75rem 1rem;
     background: #1e293b;
     color: white;
@@ -300,61 +291,50 @@
   }
 
   .panel-left {
-    width: 320px;
+    width: 300px;
     flex-shrink: 0;
     border-right: 1px solid #e2e8f0;
     overflow-y: auto;
-    padding: 1rem;
+    background: #f8fafc;
   }
 
   .panel-right {
     flex: 1;
     overflow-y: auto;
-    padding: 1.5rem 2rem;
+    padding: 2rem 3rem;
   }
 
-  .loading, .error {
+  .status {
     padding: 2rem;
     text-align: center;
     color: #64748b;
   }
 
-  .error { color: #ef4444; }
-
-  .verse {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid #f1f5f9;
+  .status.error {
+    color: #ef4444;
   }
 
-  .verse-num {
-    font-size: 0.8rem;
-    color: #94a3b8;
-    flex-shrink: 0;
-    min-width: 1.5rem;
-    text-align: right;
+  /* ── Quran text area ── */
+  .quran-text {
+    font-family: 'Amiri', 'Scheherazade New', 'KFGQPC Uthmanic Script HAFS', serif;
+    font-size: 1.8rem;
+    line-height: 3rem;
+    text-align: justify;
+    /* CRITICAL: no gaps between inline elements */
+    word-spacing: 0.15rem;
   }
 
-  .verse-text {
-    font-size: 1.6rem;
-    line-height: 2.2;
-    font-family: 'Amiri', 'Scheherazade New', serif;
-    flex: 1;
-  }
-
-  .token {
+  .verse-block {
     display: inline;
-    margin: 0 0.1rem;
   }
 
+  /* morpheme spans must be display:inline with NO whitespace between them in HTML */
   .morpheme {
+    display: inline;
     cursor: pointer;
     border-radius: 3px;
-    padding: 0 2px;
-    transition: background 0.15s;
+    padding: 0 1px;
+    transition: background 0.12s;
   }
 
   .morpheme:hover {
@@ -364,5 +344,16 @@
   .morpheme.selected {
     background: #3b82f6;
     color: white;
+    border-radius: 3px;
+  }
+
+  .verse-end {
+    display: inline;
+    color: #b45309;
+    font-size: 1.5rem;
+    margin-right: 0.4rem;
+    margin-left: 0.2rem;
+    cursor: default;
+    font-family: 'Amiri', serif;
   }
 </style>
