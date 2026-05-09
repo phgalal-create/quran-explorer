@@ -137,17 +137,19 @@
     loadVerses();
   }
 
-async function loadVerses() {
+  async function loadVerses() {
     loading = true;
     error = null;
     selectedMorpheme = null;
     try {
-      const data = await fetchAll('morpheme', {
-        select: 'id,surah,verse,token,morpheme_pos,morpheme_u,morpheme_s',
+      // Query verse table filtered by surah, join down to morphemes
+      // verse → token → morpheme
+      const data = await fetchAll('verse', {
+        select: 'verse,token(token_pos,text_uthmani,morpheme(id,morpheme_pos,morpheme_u,morpheme_s,max_morphemes))',
         surah: `eq.${selectedSurah}`,
-        order: 'verse,token,morpheme_pos'
+        order: 'verse'
       });
-      verses = groupByVerse(data);
+      verses = buildVerses(data);
     } catch (e) {
       error = e.message;
       console.error(e);
@@ -156,17 +158,17 @@ async function loadVerses() {
     }
   }
 
-  function groupByVerse(rows) {
-    const map = new Map();
-    for (const row of rows) {
-      if (!map.has(row.verse)) map.set(row.verse, { verse: row.verse, tokens: new Map() });
-      const v = map.get(row.verse);
-      if (!v.tokens.has(row.token)) v.tokens.set(row.token, []);
-      v.tokens.get(row.token).push(row);
-    }
-    return [...map.values()].map(v => ({
+  function buildVerses(data) {
+    // data is array of verse rows, each with nested token array, each token with nested morpheme array
+    return data.map(v => ({
       verse: v.verse,
-      tokens: [...v.tokens.values()]
+      tokens: (v.token || [])
+        .sort((a, b) => a.token_pos - b.token_pos)
+        .map(t => ({
+          token_pos: t.token_pos,
+          text: t.text_uthmani,
+          morphemes: (t.morpheme || []).sort((a, b) => a.morpheme_pos - b.morpheme_pos)
+        }))
     }));
   }
 
@@ -225,11 +227,11 @@ async function loadVerses() {
       {:else}
         {#each verses as v}
           <div class="verse" id="verse-{v.verse}">
-            <span class="verse-num">({v.verse})</span>
+            <span class="verse-num">{v.verse}</span>
             <span class="verse-text" dir="rtl">
               {#each v.tokens as token}
                 <span class="token">
-                  {#each token as morpheme}
+                  {#each token.morphemes as morpheme}
                     <span
                       class="morpheme"
                       class:selected={selectedMorpheme?.id === morpheme.id}
@@ -332,17 +334,20 @@ async function loadVerses() {
     font-size: 0.8rem;
     color: #94a3b8;
     flex-shrink: 0;
+    min-width: 1.5rem;
+    text-align: right;
   }
 
   .verse-text {
     font-size: 1.6rem;
     line-height: 2.2;
     font-family: 'Amiri', 'Scheherazade New', serif;
+    flex: 1;
   }
 
   .token {
     display: inline;
-    margin: 0 0.15rem;
+    margin: 0 0.1rem;
   }
 
   .morpheme {
