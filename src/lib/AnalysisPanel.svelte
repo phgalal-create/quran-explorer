@@ -1,7 +1,3 @@
-The mismatch is clear: +page.svelte passes tokenId but AnalysisPanel.svelte expects morpheme. The panel needs to accept a tokenId, fetch the morphemes for that token, and display them.
-
-Replace src/lib/AnalysisPanel.svelte entirely:
-
 <script>
   import { fetchAll } from '$lib/supabase.js';
 
