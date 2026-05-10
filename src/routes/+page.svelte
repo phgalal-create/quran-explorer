@@ -125,7 +125,7 @@
 .toolbar{display:flex;gap:16px;align-items:center;padding:10px 16px;background:white;border-bottom:1px solid #ddd;flex-shrink:0;}
 .toolbar-label{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;font-weight:500;}
 .toolbar-label select{border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:14px;min-width:200px;cursor:pointer;}
-.content{flex:1;overflow-y:auto;padding:20px;}
+.content{flex:1;overflow-y:auto;padding:20px;direction:ltr;}
 .empty{text-align:center;color:#bbb;margin-top:80px;font-size:18px;font-family:'Traditional Arabic',Arial,sans-serif;}
 .surah-title{text-align:center;margin-bottom:20px;}
 .arabic-name{font-size:28px;font-family:'Traditional Arabic',Arial,sans-serif;color:#1a472a;direction:rtl;}
