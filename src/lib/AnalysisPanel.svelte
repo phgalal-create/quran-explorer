@@ -12,7 +12,7 @@
   let rootCache        = {};
 
   // ── UI ───────────────────────────────────────────────────────────────────────
-  let mode       = $state('view');   // 'view' | 'edit'
+  let mode       = $state('view');
   let loading    = $state(false);
   let statusMsg  = $state('');
   let statusType = $state('');
@@ -38,8 +38,19 @@
   let fNtype     = $state('');
   let fNotes     = $state('');
   let fSp        = $state('');
+
+  // lemmaRows: { alId, text, lemmaType, certainty, rank }
+  // patternRows: { apId, text, patternType, certainty, rank }
   let lemmaRows   = $state([]);
   let patternRows = $state([]);
+
+  // ── Inline add state (view mode) ──────────────────────────────────────────────
+  let addingLemma   = $state(false);
+  let newLemmaText  = $state('');
+  let newLemmaCert  = $state(1);
+  let addingPattern = $state(false);
+  let newPatText    = $state('');
+  let newPatCert    = $state(1);
 
   // ── Derived ───────────────────────────────────────────────────────────────────
   let posGroups  = $derived(posData.reduce((acc, p) => {
@@ -72,8 +83,7 @@
   }
 
   async function selectMorpheme(m) {
-    selectedMorpheme = m;
-    loading = true;
+    selectedMorpheme = m; loading = true;
     await loadAnalyses(m.id);
     loading = false;
   }
@@ -115,15 +125,36 @@
       rootStatus = `✓ ID: ${a.root_id}`;
     } else { fRoot = ''; fRootType = ''; rootStatus = ''; }
 
-    const als = await get('analysis_lemma', {
-      select: 'rank,certainty,lemma(arabic_text)', analysis_id: `eq.${a.id}`, order: 'rank.asc'
-    });
-    lemmaRows = (als || []).map(al => ({ text: al.lemma?.arabic_text || '', certainty: al.certainty }));
+    await reloadLemmas(a.id);
+    await reloadPatterns(a.id);
+  }
 
-    const aps = await get('analysis_pattern', {
-      select: 'rank,certainty,pattern(arabic_text)', analysis_id: `eq.${a.id}`, order: 'rank.asc'
+  async function reloadLemmas(analysisId) {
+    const als = await get('analysis_lemma', {
+      select: 'id,rank,certainty,lemma(arabic_text,lemma_type(name))',
+      analysis_id: `eq.${analysisId}`, order: 'rank.asc'
     });
-    patternRows = (aps || []).map(ap => ({ text: ap.pattern?.arabic_text || '', certainty: ap.certainty }));
+    lemmaRows = (als || []).map(al => ({
+      alId: al.id,
+      text: al.lemma?.arabic_text || '',
+      lemmaType: al.lemma?.lemma_type?.name || '',
+      certainty: al.certainty,
+      rank: al.rank
+    }));
+  }
+
+  async function reloadPatterns(analysisId) {
+    const aps = await get('analysis_pattern', {
+      select: 'id,rank,certainty,pattern(arabic_text,pattern_type(name))',
+      analysis_id: `eq.${analysisId}`, order: 'rank.asc'
+    });
+    patternRows = (aps || []).map(ap => ({
+      apId: ap.id,
+      text: ap.pattern?.arabic_text || '',
+      patternType: ap.pattern?.pattern_type?.name || '',
+      certainty: ap.certainty,
+      rank: ap.rank
+    }));
   }
 
   function clearForm() {
@@ -132,6 +163,8 @@
     fPerson=''; fGender=''; fNumber=''; fCase=''; fDef='';
     fSp=''; fVform=''; fF1type=''; fAspect=''; fMood=''; fVoice='';
     fNtype=''; fNotes=''; lemmaRows=[]; patternRows=[];
+    addingLemma=false; newLemmaText=''; newLemmaCert=1;
+    addingPattern=false; newPatText=''; newPatCert=1;
   }
 
   // ── Mode transitions ──────────────────────────────────────────────────────────
@@ -148,6 +181,44 @@
 
   async function switchAnalysis(idx) {
     selIdx = idx; await fillForm(analyses[idx]); mode = 'view';
+  }
+
+  // ── Inline lemma actions (view mode) ──────────────────────────────────────────
+  async function viewDeleteLemma(alId) {
+    await del('analysis_lemma', alId);
+    lemmaRows = lemmaRows.filter(r => r.alId !== alId);
+  }
+
+  async function viewAddLemma() {
+    const text = newLemmaText.trim();
+    if (!text || !analyses[selIdx]) return;
+    const analysisId = analyses[selIdx].id;
+    let lemmaId;
+    const ex = await get('lemma', { select: 'id', arabic_text: `eq.${text}` });
+    if (ex?.length > 0) { lemmaId = ex[0].id; }
+    else { const cr = await post('lemma', { arabic_text: text }); lemmaId = cr[0]?.id; }
+    if (lemmaId) await post('analysis_lemma', { analysis_id: analysisId, lemma_id: lemmaId, rank: lemmaRows.length + 1, certainty: parseInt(newLemmaCert) });
+    await reloadLemmas(analysisId);
+    addingLemma = false; newLemmaText = ''; newLemmaCert = 1;
+  }
+
+  // ── Inline pattern actions (view mode) ────────────────────────────────────────
+  async function viewDeletePattern(apId) {
+    await del('analysis_pattern', apId);
+    patternRows = patternRows.filter(r => r.apId !== apId);
+  }
+
+  async function viewAddPattern() {
+    const text = newPatText.trim();
+    if (!text || !analyses[selIdx]) return;
+    const analysisId = analyses[selIdx].id;
+    let patternId;
+    const ex = await get('pattern', { select: 'id', arabic_text: `eq.${text}` });
+    if (ex?.length > 0) { patternId = ex[0].id; }
+    else { const cr = await post('pattern', { arabic_text: text }); patternId = cr[0]?.id; }
+    if (patternId) await post('analysis_pattern', { analysis_id: analysisId, pattern_id: patternId, rank: patternRows.length + 1, certainty: parseInt(newPatCert) });
+    await reloadPatterns(analysisId);
+    addingPattern = false; newPatText = ''; newPatCert = 1;
   }
 
   // ── Root lookup ───────────────────────────────────────────────────────────────
@@ -199,14 +270,15 @@
       const res = await patch('analysis', analysisId, payload);
       if (res.error) { showStatus('Error: '+res.error.message,'error'); return; }
     }
-    await saveLemmas(analysisId);
-    await savePatterns(analysisId);
+    await saveEditLemmas(analysisId);
+    await saveEditPatterns(analysisId);
     showStatus('Saved ✓','success');
     await loadAnalyses(selectedMorpheme.id);
     setTimeout(() => statusMsg='', 3000);
   }
 
-  async function saveLemmas(analysisId) {
+  // edit-mode lemma/pattern save (replaces all)
+  async function saveEditLemmas(analysisId) {
     await fetch(`${SB_URL}/rest/v1/analysis_lemma?analysis_id=eq.${analysisId}`,
       { method:'DELETE', headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`} });
     for (let i=0; i<lemmaRows.length; i++) {
@@ -219,7 +291,7 @@
     }
   }
 
-  async function savePatterns(analysisId) {
+  async function saveEditPatterns(analysisId) {
     await fetch(`${SB_URL}/rest/v1/analysis_pattern?analysis_id=eq.${analysisId}`,
       { method:'DELETE', headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`} });
     for (let i=0; i<patternRows.length; i++) {
@@ -241,11 +313,11 @@
   }
 
   function showStatus(msg,type) { statusMsg=msg; statusType=type; }
-  function removeLemma(i)   { lemmaRows   = lemmaRows.filter((_,j)=>j!==i); }
-  function removePattern(i) { patternRows = patternRows.filter((_,j)=>j!==i); }
+  function removeLemmaEdit(i)   { lemmaRows   = lemmaRows.filter((_,j)=>j!==i); }
+  function removePatternEdit(i) { patternRows = patternRows.filter((_,j)=>j!==i); }
 
-  // ── Display helpers ───────────────────────────────────────────────────────────
-  const d = v => v || '—';
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  const d          = v => v || '—';
   const personLbl  = p => ({1:'1st',2:'2nd',3:'3rd'}[p] || '—');
   const certLbl    = c => ({1:'Confirmed',2:'Probable',3:'Uncertain'}[c] || '—');
   const certClass  = c => ({1:'cert-confirmed',2:'cert-probable',3:'cert-uncertain'}[c] || '');
@@ -276,70 +348,66 @@
 
     {#if selectedMorpheme}
 
-      <!-- ── Analysis header ──────────────────────────────────────────────────── -->
-      <div class="a-header">
-
-        <!-- Row 1: tabs + action buttons -->
-        <div class="a-top">
-          <div class="a-tabs">
-            {#each analyses as a, i}
-              <button class="a-tab" class:active={i===selIdx && mode==='view'}
-                onclick={()=>switchAnalysis(i)}>
-                {i+1}{a.is_primary?' ★':''}
-              </button>
-            {/each}
-            <button class="a-tab-new" onclick={startNew}>+ New</button>
-          </div>
-          <div class="a-btns">
-            {#if mode==='view'}
-              <button class="abtn edit"   onclick={startEdit}>Edit</button>
-              <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
-            {:else}
-              <button class="abtn save"   onclick={saveAnalysis}>Save</button>
-              <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
-            {/if}
-          </div>
+      <!-- ── Action bar ────────────────────────────────────────────────────────── -->
+      <div class="action-bar">
+        <div class="action-left">
+          {#if mode==='view'}
+            <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
+            <button class="abtn edit"   onclick={startEdit}>Edit</button>
+            <button class="abtn new"    onclick={startNew}>New +</button>
+          {:else}
+            <button class="abtn save"   onclick={saveAnalysis}>Save</button>
+            <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
+          {/if}
         </div>
 
-        <!-- Row 2: POS summary + certainty (view mode) -->
-        {#if mode==='view' && analyses.length>0}
-          <div class="a-summary">
-            <div class="a-pos-info">
-              {#if fPos}<span class="pos-code">{fPos}</span>{/if}
-              {#if posGroup}<span class="pos-group">{posGroup}</span>{/if}
-              {#if currentPOS?.arabic}<span class="pos-ar">{currentPOS.arabic}</span>{/if}
-              {#if currentPOS?.meaning}<span class="pos-meaning">— {currentPOS.meaning}</span>{/if}
-            </div>
-            <span class="cert-pill {certClass(fCert)}">{certLbl(fCert)}</span>
-          </div>
-        {/if}
+        <!-- Analysis tabs: each is a pill; active one shows certainty -->
+        <div class="a-pills">
+          {#each analyses as a, i}
+            <button class="a-pill" class:active={i===selIdx}
+              onclick={()=>switchAnalysis(i)}>
+              ({a.pos_code||'?'}) {a.is_primary?'★':''}{i+1}
+              {#if i===selIdx}<span class="pill-cert">{certLbl(fCert)}</span>{/if}
+            </button>
+          {/each}
+        </div>
       </div>
 
-      <!-- ── Scrollable body ───────────────────────────────────────────────────── -->
+      <!-- ── Body ─────────────────────────────────────────────────────────────── -->
       <div class="body-scroll">
 
-        <!-- ══════════════ VIEW MODE ══════════════ -->
+        <!-- ══════════ VIEW MODE ══════════ -->
         {#if mode==='view' && analyses.length>0}
 
-          <!-- 1. MORPHEME TYPE -->
-          <div class="sec">
-            <div class="sec-hd">Morpheme</div>
-            <div class="kv">
-              <span class="kv-lbl">Type</span>
-              <span class="kv-val mtype">{d(fMtype)}</span>
-            </div>
+          <!-- Morphological class (top-level row) -->
+          <div class="top-row">
+            <span class="top-lbl">Morphological class</span>
+            <span class="top-val">{d(fMtype)}</span>
           </div>
 
-          <!-- 2. ROOT & DERIVATION (Verbal / Nominal) -->
+          <!-- POS -->
+          <div class="top-row">
+            <span class="top-lbl">POS</span>
+            <span class="top-val">
+              {#if currentPOS}
+                {currentPOS.meaning} — <span class="ar-inline">{currentPOS.arabic}</span>
+              {:else}—{/if}
+            </span>
+          </div>
+
+          <!-- ROOT & DERIVATION -->
           {#if showVN}
             <div class="sec">
-              <div class="sec-hd">Root &amp; Derivation — الجذر والاشتقاق</div>
+              <div class="sec-hd">
+                <span>Root &amp; Derivation</span>
+                <span class="sec-hd-ar">الجذر والاشتقاق</span>
+              </div>
 
               <div class="kv">
                 <span class="kv-lbl">Root جذر</span>
-                <span class="kv-val ar linkable" data-type="root">
-                  {d(fRoot)}
-                  {#if fRootType}<span class="mini-chip">{fRootType}</span>{/if}
+                <span class="kv-right">
+                  <span class="kv-ar linkable" data-type="root">{d(fRoot)}</span>
+                  {#if fRootType}<span class="kv-sub">{fRootType}</span>{/if}
                 </span>
               </div>
 
@@ -350,7 +418,7 @@
 
               {#if showVerbal && fVform==1}
                 <div class="kv">
-                  <span class="kv-lbl">F1 Vowel Pattern</span>
+                  <span class="kv-lbl">F1 Vowel</span>
                   <span class="kv-val mono">{d(fF1type)}</span>
                 </div>
               {/if}
@@ -361,127 +429,129 @@
                   <span class="kv-val">{d(fNtype)}</span>
                 </div>
               {/if}
+            </div>
+          {/if}
 
-              <!-- Patterns -->
-              {#if patternRows.length>0}
-                {#each patternRows as row, i}
-                  <div class="kv">
-                    <span class="kv-lbl">{i===0?'Pattern وزن':''}</span>
-                    <span class="kv-val ar linkable" data-type="pattern">
-                      {row.text||'—'}
-                      <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
-                    </span>
-                  </div>
-                {/each}
-              {:else}
-                <div class="kv">
-                  <span class="kv-lbl">Pattern وزن</span>
-                  <span class="kv-val">—</span>
+          <!-- PATTERN (separate section) -->
+          {#if showVN}
+            <div class="sec">
+              <div class="sec-hd">
+                <span>Pattern</span>
+                <span class="sec-hd-ar">وزن</span>
+              </div>
+
+              {#each patternRows as row}
+                <div class="list-row">
+                  <span class="list-rank">{row.rank}</span>
+                  <span class="list-ar linkable" data-type="pattern">{row.text||'—'}</span>
+                  <span class="list-type">{row.patternType||''}</span>
+                  <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
+                  <button class="list-del" onclick={()=>viewDeletePattern(row.apId)} title="Remove">✕</button>
                 </div>
+              {/each}
+
+              {#if addingPattern}
+                <div class="add-inline">
+                  <input class="add-ar-input" bind:value={newPatText}
+                    placeholder="فَعَلَ" dir="rtl" autofocus>
+                  <select bind:value={newPatCert} class="add-cert">
+                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
+                  </select>
+                  <button class="add-ok"  onclick={viewAddPattern}>✓</button>
+                  <button class="add-cancel" onclick={()=>{addingPattern=false;newPatText=''}}>✕</button>
+                </div>
+              {:else}
+                <button class="list-add" onclick={()=>addingPattern=true}>+ Add Pattern</button>
               {/if}
             </div>
           {/if}
 
-          <!-- 3. LEXEME (Lemma — always) -->
+          <!-- LEMMA (separate section) -->
           <div class="sec">
-            <div class="sec-hd">Lexeme — المعجم</div>
-            {#if lemmaRows.length>0}
-              {#each lemmaRows as row, i}
-                <div class="kv">
-                  <span class="kv-lbl">{i===0?'Lemma':''}</span>
-                  <span class="kv-val ar linkable" data-type="lemma">
-                    {row.text||'—'}
-                    <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
-                  </span>
-                </div>
-              {/each}
-            {:else}
-              <div class="kv">
-                <span class="kv-lbl">Lemma</span>
-                <span class="kv-val">—</span>
+            <div class="sec-hd">
+              <span>Lexeme</span>
+              <span class="sec-hd-ar">المعجم</span>
+            </div>
+
+            {#each lemmaRows as row}
+              <div class="list-row">
+                <span class="list-rank">{row.rank}</span>
+                <span class="list-ar linkable" data-type="lemma">{row.text||'—'}</span>
+                <span class="list-type">{row.lemmaType||''}</span>
+                <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
+                <button class="list-del" onclick={()=>viewDeleteLemma(row.alId)} title="Remove">✕</button>
               </div>
+            {/each}
+
+            {#if addingLemma}
+              <div class="add-inline">
+                <input class="add-ar-input" bind:value={newLemmaText}
+                  placeholder="عَالِم" dir="rtl" autofocus>
+                <select bind:value={newLemmaCert} class="add-cert">
+                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
+                </select>
+                <button class="add-ok"  onclick={viewAddLemma}>✓</button>
+                <button class="add-cancel" onclick={()=>{addingLemma=false;newLemmaText=''}}>✕</button>
+              </div>
+            {:else}
+              <button class="list-add" onclick={()=>addingLemma=true}>+ Add Lemma</button>
             {/if}
           </div>
 
-          <!-- 4. GRAMMATICAL FEATURES -->
+          <!-- GRAMMATICAL FEATURES -->
           {#if showVN || fSp}
             <div class="sec">
-              <div class="sec-hd">Grammatical Features — الخصائص النحوية</div>
+              <div class="sec-hd">
+                <span>Grammatical Features</span>
+                <span class="sec-hd-ar">الخصائص النحوية</span>
+              </div>
 
               {#if showVN}
-                <div class="feat-grid3">
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Person</div>
-                    <div class="feat-val">{personLbl(fPerson)}</div>
-                  </div>
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Gender</div>
-                    <div class="feat-val">{d(fGender)}</div>
-                  </div>
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Number</div>
-                    <div class="feat-val">{d(fNumber)}</div>
-                  </div>
+                <div class="feat-grid">
+                  <div class="feat-cell"><div class="feat-lbl">Person</div><div class="feat-val">{personLbl(fPerson)}</div></div>
+                  <div class="feat-cell"><div class="feat-lbl">Gender</div><div class="feat-val">{d(fGender)}</div></div>
+                  <div class="feat-cell"><div class="feat-lbl">Number</div><div class="feat-val">{d(fNumber)}</div></div>
                 </div>
               {/if}
 
               {#if showVerbal}
-                <div class="feat-grid3">
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Aspect</div>
-                    <div class="feat-val">{d(fAspect)}</div>
-                  </div>
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Mood</div>
-                    <div class="feat-val">{d(fMood)}</div>
-                  </div>
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Voice</div>
-                    <div class="feat-val">{d(fVoice)}</div>
-                  </div>
+                <div class="feat-grid">
+                  <div class="feat-cell"><div class="feat-lbl">Aspect</div><div class="feat-val">{d(fAspect)}</div></div>
+                  <div class="feat-cell"><div class="feat-lbl">Mood</div><div class="feat-val">{d(fMood)}</div></div>
+                  <div class="feat-cell"><div class="feat-lbl">Voice</div><div class="feat-val">{d(fVoice)}</div></div>
                 </div>
               {/if}
 
               {#if showNominal}
-                <div class="feat-grid2">
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Case</div>
-                    <div class="feat-val">{d(fCase)}</div>
-                  </div>
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Definiteness</div>
-                    <div class="feat-val">{d(fDef)}</div>
-                  </div>
+                <div class="feat-grid">
+                  <div class="feat-cell"><div class="feat-lbl">Case</div><div class="feat-val">{d(fCase)}</div></div>
+                  <div class="feat-cell"><div class="feat-lbl">Definiteness</div><div class="feat-val">{d(fDef)}</div></div>
                 </div>
               {/if}
 
               {#if fSp}
-                <div class="feat-grid1">
-                  <div class="feat-cell">
-                    <div class="feat-lbl">Sister-verb (SP)</div>
-                    <div class="feat-val ar">{fSp}</div>
-                  </div>
+                <div class="feat-grid">
+                  <div class="feat-cell"><div class="feat-lbl">Sister-verb (SP)</div><div class="feat-val ar">{fSp}</div></div>
                 </div>
               {/if}
             </div>
           {/if}
 
-          <!-- 5. NOTES -->
+          <!-- NOTES -->
           {#if fNotes}
             <div class="sec">
-              <div class="sec-hd">Notes — ملاحظات</div>
+              <div class="sec-hd"><span>Notes</span><span class="sec-hd-ar">ملاحظات</span></div>
               <div class="notes-text">{fNotes}</div>
             </div>
           {/if}
 
-        <!-- ══════════════ EDIT MODE ══════════════ -->
+        <!-- ══════════ EDIT MODE ══════════ -->
         {:else}
 
-          <!-- Type + Certainty + Primary -->
           <div class="esec">
             <div class="efield-row">
               <div class="efield">
-                <label>Morpheme Type</label>
+                <label>Morphological Type</label>
                 <select bind:value={fMtype}>
                   <option value="">--</option>
                   <option>Prefix</option><option>Stem</option><option>Suffix</option>
@@ -502,7 +572,6 @@
             </label>
           </div>
 
-          <!-- POS -->
           <div class="esec">
             <div class="esec-hd">Part of Speech</div>
             <div class="efield">
@@ -519,11 +588,9 @@
             </div>
           </div>
 
-          <!-- Root & Derivation (Verbal / Nominal) -->
           {#if showVN}
             <div class="esec">
-              <div class="esec-hd">Root &amp; Derivation — الجذر والاشتقاق</div>
-
+              <div class="esec-hd">Root &amp; Derivation</div>
               <div class="efield-row">
                 <div class="efield">
                   <label>Root جذر</label>
@@ -533,25 +600,20 @@
                   <small class="root-hint">{rootStatus}</small>
                 </div>
               </div>
-
               <div class="efield-row">
                 <div class="efield">
                   <label>Verb Form</label>
                   <select bind:value={fVform}>
                     <option value="">--</option>
-                    {#each [1,2,3,4,5,6,7,8,9,10,11,12] as n}
-                      <option value={n}>Form {n}</option>
-                    {/each}
+                    {#each [1,2,3,4,5,6,7,8,9,10,11,12] as n}<option value={n}>Form {n}</option>{/each}
                   </select>
                 </div>
                 {#if showVerbal && fVform==1}
                   <div class="efield">
-                    <label>F1 Vowel Pattern</label>
+                    <label>F1 Vowel</label>
                     <select bind:value={fF1type}>
                       <option value="">--</option>
-                      {#each ['aa','ai','au','ia','ii','iu','ua','ui','uu','??'] as t}
-                        <option value={t}>{t}</option>
-                      {/each}
+                      {#each ['aa','ai','au','ia','ii','iu','ua','ui','uu','??'] as t}<option value={t}>{t}</option>{/each}
                     </select>
                   </div>
                 {/if}
@@ -560,16 +622,15 @@
                     <label>Noun Type</label>
                     <select bind:value={fNtype}>
                       <option value="">--</option>
-                      <option value="VN">VN — Verbal Noun</option>
-                      <option value="AP">AP — Active Participle</option>
-                      <option value="PP">PP — Passive Participle</option>
+                      <option value="VN">VN</option><option value="AP">AP</option><option value="PP">PP</option>
                     </select>
                   </div>
                 {/if}
               </div>
+            </div>
 
-              <!-- Patterns -->
-              <div class="sub-label">Pattern وزن</div>
+            <div class="esec">
+              <div class="esec-hd">Pattern وزن</div>
               {#each patternRows as row, i}
                 <div class="sub-row">
                   <span class="sub-rank">{i+1}.</span>
@@ -577,17 +638,15 @@
                   <select bind:value={row.certainty} class="cert-sel">
                     <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
                   </select>
-                  <button class="btn-x" onclick={()=>removePattern(i)}>✕</button>
+                  <button class="btn-x" onclick={()=>removePatternEdit(i)}>✕</button>
                 </div>
               {/each}
-              <button class="btn-add" onclick={()=>patternRows=[...patternRows,{text:'',certainty:1}]}>+ Pattern</button>
+              <button class="btn-add" onclick={()=>patternRows=[...patternRows,{text:'',certainty:1,rank:patternRows.length+1}]}>+ Pattern</button>
             </div>
           {/if}
 
-          <!-- Lexeme -->
           <div class="esec">
-            <div class="esec-hd">Lexeme — المعجم</div>
-            <div class="sub-label">Lemma</div>
+            <div class="esec-hd">Lemma</div>
             {#each lemmaRows as row, i}
               <div class="sub-row">
                 <span class="sub-rank">{i+1}.</span>
@@ -595,16 +654,14 @@
                 <select bind:value={row.certainty} class="cert-sel">
                   <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
                 </select>
-                <button class="btn-x" onclick={()=>removeLemma(i)}>✕</button>
+                <button class="btn-x" onclick={()=>removeLemmaEdit(i)}>✕</button>
               </div>
             {/each}
-            <button class="btn-add" onclick={()=>lemmaRows=[...lemmaRows,{text:'',certainty:1}]}>+ Lemma</button>
+            <button class="btn-add" onclick={()=>lemmaRows=[...lemmaRows,{text:'',certainty:1,rank:lemmaRows.length+1}]}>+ Lemma</button>
           </div>
 
-          <!-- Grammatical Features -->
           <div class="esec">
-            <div class="esec-hd">Grammatical Features — الخصائص النحوية</div>
-
+            <div class="esec-hd">Grammatical Features</div>
             {#if showVN}
               <div class="efield-row">
                 <div class="efield"><label>Person</label>
@@ -615,23 +672,22 @@
                 </div>
                 <div class="efield"><label>Gender</label>
                   <select bind:value={fGender}>
-                    <option value="">--</option><option value="M">M — Masculine</option><option value="F">F — Feminine</option>
+                    <option value="">--</option><option value="M">M</option><option value="F">F</option>
                   </select>
                 </div>
                 <div class="efield"><label>Number</label>
                   <select bind:value={fNumber}>
                     <option value="">--</option>
-                    <option value="S">S — Singular</option><option value="D">D — Dual</option><option value="P">P — Plural</option>
+                    <option value="S">S</option><option value="D">D</option><option value="P">P</option>
                   </select>
                 </div>
               </div>
             {/if}
-
             {#if showVerbal}
               <div class="efield-row">
                 <div class="efield"><label>Aspect</label>
                   <select bind:value={fAspect}>
-                    <option value="">--</option><option value="PERF">PERF — Perfect</option><option value="IMPF">IMPF — Imperfect</option>
+                    <option value="">--</option><option value="PERF">PERF</option><option value="IMPF">IMPF</option>
                   </select>
                 </div>
                 <div class="efield"><label>Mood</label>
@@ -643,45 +699,38 @@
                 </div>
                 <div class="efield"><label>Voice</label>
                   <select bind:value={fVoice}>
-                    <option value="">--</option><option value="ACT">ACT — Active</option><option value="PASS">PASS — Passive</option>
+                    <option value="">--</option><option value="ACT">ACT</option><option value="PASS">PASS</option>
                   </select>
                 </div>
               </div>
             {/if}
-
             {#if showNominal}
               <div class="efield-row">
                 <div class="efield"><label>Case</label>
                   <select bind:value={fCase}>
                     <option value="">--</option>
-                    <option value="NOM">NOM — Nominative</option>
-                    <option value="ACC">ACC — Accusative</option>
-                    <option value="GEN">GEN — Genitive</option>
+                    <option value="NOM">NOM</option><option value="ACC">ACC</option><option value="GEN">GEN</option>
                   </select>
                 </div>
                 <div class="efield"><label>Definiteness</label>
                   <select bind:value={fDef}>
-                    <option value="">--</option><option value="DEF">DEF — Definite</option><option value="INDEF">INDEF — Indefinite</option>
+                    <option value="">--</option><option value="DEF">DEF</option><option value="INDEF">INDEF</option>
                   </select>
                 </div>
               </div>
             {/if}
-
             <div class="efield-row">
-              <div class="efield"><label>Sister-verb (SP)</label>
+              <div class="efield"><label>SP</label>
                 <select bind:value={fSp}>
                   <option value="">--</option>
-                  <option value="كَان">كَان</option>
-                  <option value="إِنّ">إِنّ</option>
-                  <option value="لَيْسَ">لَيْسَ</option>
+                  <option value="كَان">كَان</option><option value="إِنّ">إِنّ</option><option value="لَيْسَ">لَيْسَ</option>
                 </select>
               </div>
             </div>
           </div>
 
-          <!-- Notes -->
           <div class="esec">
-            <div class="esec-hd">Notes — ملاحظات</div>
+            <div class="esec-hd">Notes</div>
             <textarea class="notes-input" bind:value={fNotes} rows="3" dir="rtl" placeholder="ملاحظات..."></textarea>
           </div>
 
@@ -698,73 +747,87 @@
 
 <!-- ════════════════════════════════════════════════════════════════════════════ -->
 <style>
-/* ── Shell ─────────────────────────────────────────────────────────────────── */
+/* Shell */
 .panel{display:flex;flex-direction:column;height:100%;background:white;border-left:1px solid #ddd;overflow:hidden;}
 .splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#ccc;}
 .splash-ar{font-size:22px;font-family:'Traditional Arabic',Arial,sans-serif;}
 .splash-en{font-size:13px;}
 
-/* ── Morpheme tabs ─────────────────────────────────────────────────────────── */
+/* Morpheme tabs */
 .morpheme-tabs{display:flex;border-bottom:2px solid #eee;overflow-x:auto;flex-shrink:0;direction:rtl;}
 .m-tab{padding:10px 18px;border:none;background:none;cursor:pointer;font-size:22px;font-family:'Traditional Arabic',Arial,sans-serif;border-bottom:3px solid transparent;color:#555;white-space:nowrap;transition:background 0.12s;}
 .m-tab:hover{background:#f5f5f5;}
 .m-tab.active{border-bottom-color:#1a472a;color:#1a472a;font-weight:bold;}
 
-/* ── Analysis header ────────────────────────────────────────────────────────── */
-.a-header{flex-shrink:0;border-bottom:1px solid #e0e0e0;background:#fafafa;}
-.a-top{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;gap:8px;}
-.a-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-.a-tab{padding:4px 11px;border:1px solid #ddd;border-radius:4px;background:white;cursor:pointer;font-size:12px;transition:background 0.1s;}
-.a-tab:hover{background:#f0f0f0;}
-.a-tab.active{background:#1a472a;color:white;border-color:#1a472a;}
-.a-tab-new{padding:4px 11px;border:1px solid #2980b9;border-radius:4px;background:white;color:#2980b9;cursor:pointer;font-size:12px;}
-.a-tab-new:hover{background:#ebf5fb;}
-.a-btns{display:flex;gap:5px;flex-shrink:0;}
+/* Action bar */
+.action-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #e8e8e8;flex-shrink:0;background:#fafafa;gap:8px;}
+.action-left{display:flex;gap:5px;}
 .abtn{border:none;border-radius:4px;padding:5px 13px;cursor:pointer;font-size:12px;font-weight:500;}
 .abtn.edit  {background:#1a472a;color:white;}
 .abtn.danger{background:#e74c3c;color:white;}
+.abtn.new   {background:#2980b9;color:white;}
 .abtn.save  {background:#1a472a;color:white;}
 .abtn.cancel{background:#95a5a6;color:white;}
 
-/* Analysis summary bar (view mode) */
-.a-summary{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;border-top:1px solid #eee;flex-wrap:wrap;gap:6px;}
-.a-pos-info{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.pos-code{font-family:monospace;font-size:13px;background:#f0f0f0;padding:2px 7px;border-radius:4px;color:#333;}
-.pos-group{font-size:12px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;}
-.pos-ar{font-size:17px;font-family:'Traditional Arabic',Arial,sans-serif;color:#333;}
-.pos-meaning{font-size:12px;color:#888;font-style:italic;}
+/* Analysis pills */
+.a-pills{display:flex;gap:4px;flex-wrap:wrap;}
+.a-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #ccc;border-radius:14px;background:white;cursor:pointer;font-size:12px;transition:all 0.12s;}
+.a-pill:hover{border-color:#1a472a;}
+.a-pill.active{background:#1a472a;color:white;border-color:#1a472a;}
+.pill-cert{font-size:10px;opacity:0.85;border-left:1px solid rgba(255,255,255,0.4);padding-left:5px;margin-left:2px;}
 
-/* Certainty pills */
-.cert-pill{font-size:11px;padding:3px 10px;border-radius:10px;white-space:nowrap;font-weight:500;}
-.cert-confirmed{background:#e8f5e9;color:#1b5e20;}
-.cert-probable {background:#fff8e1;color:#e65100;}
-.cert-uncertain{background:#fce4ec;color:#b71c1c;}
-
-/* Certainty dots (in lists) */
-.cert-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;}
-.cert-dot.cert-confirmed{background:#43a047;}
-.cert-dot.cert-probable {background:#fb8c00;}
-.cert-dot.cert-uncertain{background:#e53935;}
-
-/* ── Scrollable body ────────────────────────────────────────────────────────── */
+/* Body */
 .body-scroll{flex:1;overflow-y:auto;direction:ltr;}
 
-/* ── VIEW MODE ──────────────────────────────────────────────────────────────── */
-.sec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
-.sec-hd{font-size:10px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:8px;opacity:0.7;}
+/* ── VIEW MODE ── */
+/* Top rows (Morphological class, POS) */
+.top-row{display:flex;align-items:baseline;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #f5f5f5;}
+.top-lbl{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.5px;}
+.top-val{font-size:14px;color:#222;font-weight:500;}
+.ar-inline{font-family:'Traditional Arabic',Arial,sans-serif;font-size:18px;direction:rtl;}
 
-/* Key-value rows: label left (EN), value right (AR or plain) */
-.kv{display:flex;align-items:center;justify-content:space-between;padding:3px 0;min-height:26px;}
-.kv-lbl{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;flex-shrink:0;min-width:90px;}
-.kv-val{font-size:14px;color:#222;text-align:left;}
-.kv-val.ar{font-size:21px;font-family:'Traditional Arabic',Arial,sans-serif;direction:rtl;text-align:right;}
-.kv-val.mono{font-family:monospace;background:#f5f5f5;padding:1px 6px;border-radius:3px;font-size:13px;}
-.kv-val.mtype{font-weight:600;color:#1a472a;}
-.mini-chip{font-size:10px;padding:1px 6px;border-radius:8px;background:#f0f7f0;color:#2e7d32;margin-right:6px;border:1px solid #c8e6c9;vertical-align:middle;}
+/* Sections */
+.sec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
+.sec-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.sec-hd span:first-child{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.6px;opacity:0.8;}
+.sec-hd-ar{font-size:14px;font-family:'Traditional Arabic',Arial,sans-serif;color:#aaa;direction:rtl;}
+
+/* Key-value rows */
+.kv{display:flex;align-items:center;justify-content:space-between;padding:4px 0;min-height:28px;}
+.kv-lbl{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;flex-shrink:0;}
+.kv-right{display:flex;align-items:center;gap:6px;direction:rtl;}
+.kv-val{font-size:14px;color:#222;}
+.kv-ar{font-size:21px;font-family:'Traditional Arabic',Arial,sans-serif;direction:rtl;color:#222;}
+.kv-sub{font-size:11px;padding:2px 7px;background:#f0f7f0;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;}
+.mono{font-family:monospace;background:#f5f5f5;padding:1px 6px;border-radius:3px;font-size:13px;}
 .linkable{cursor:default;}
 
+/* List rows (pattern / lemma in view mode) */
+.list-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #f8f8f8;}
+.list-row:last-of-type{border-bottom:none;}
+.list-rank{font-size:11px;color:#bbb;min-width:16px;flex-shrink:0;}
+.list-ar{font-size:20px;font-family:'Traditional Arabic',Arial,sans-serif;direction:rtl;flex:1;text-align:right;color:#222;}
+.list-type{font-size:11px;color:#888;flex-shrink:0;max-width:80px;text-align:left;}
+.list-del{background:none;border:none;color:#ddd;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;transition:color 0.1s;}
+.list-del:hover{color:#e74c3c;}
+
+/* Inline add form */
+.add-inline{display:flex;align-items:center;gap:5px;padding:5px 4px;margin-top:4px;}
+.add-ar-input{flex:1;border:1px solid #1a472a;border-radius:4px;padding:5px 8px;font-size:18px;font-family:'Traditional Arabic',Arial,sans-serif;outline:none;}
+.add-cert{width:44px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;}
+.add-ok{background:#1a472a;color:white;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:13px;}
+.add-cancel{background:none;border:1px solid #ddd;border-radius:4px;padding:5px 8px;cursor:pointer;font-size:13px;color:#888;}
+.list-add{background:none;border:1px dashed #2980b9;color:#2980b9;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px;margin-top:6px;width:100%;text-align:center;}
+.list-add:hover{background:#ebf5fb;}
+
+/* Cert dots */
+.cert-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.cert-confirmed{background:#43a047;}
+.cert-probable {background:#fb8c00;}
+.cert-uncertain{background:#e53935;}
+
 /* Feature grids */
-.feat-grid3,.feat-grid2,.feat-grid1{display:flex;gap:0;margin-bottom:4px;border:1px solid #f0f0f0;border-radius:6px;overflow:hidden;}
+.feat-grid{display:flex;border:1px solid #f0f0f0;border-radius:6px;overflow:hidden;margin-bottom:6px;}
 .feat-cell{flex:1;padding:7px 10px;border-right:1px solid #f0f0f0;}
 .feat-cell:last-child{border-right:none;}
 .feat-lbl{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:3px;}
@@ -773,16 +836,15 @@
 
 .notes-text{font-size:13px;color:#555;direction:rtl;line-height:1.7;padding:6px 8px;background:#fafafa;border-radius:4px;border:1px solid #eee;}
 
-/* ── EDIT MODE ──────────────────────────────────────────────────────────────── */
+/* ── EDIT MODE ── */
 .esec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
-.esec-hd{font-size:10px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:8px;opacity:0.7;}
+.esec-hd{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;opacity:0.8;}
 .efield-row{display:flex;gap:8px;margin-bottom:8px;}
 .efield{display:flex;flex-direction:column;gap:3px;flex:1;}
 .efield label{font-size:11px;color:#888;}
 .efield select,.efield input,.efield textarea{border:1px solid #ddd;border-radius:4px;padding:5px 8px;font-size:13px;width:100%;background:white;}
 .efield select:focus,.efield input:focus,.efield textarea:focus{outline:none;border-color:#1a472a;}
 .ar-input{font-family:'Traditional Arabic',Arial,sans-serif !important;font-size:18px !important;}
-.sub-label{font-size:11px;color:#888;margin-bottom:5px;font-weight:500;}
 .sub-row{display:flex;gap:6px;align-items:center;margin-bottom:5px;padding:5px 8px;background:#f9f9f9;border:1px solid #eee;border-radius:4px;}
 .sub-rank{font-size:12px;color:#bbb;min-width:16px;flex-shrink:0;}
 .sub-inp{flex:1;border:1px solid #ddd;border-radius:4px;padding:4px 8px;font-size:18px;font-family:'Traditional Arabic',Arial,sans-serif;}
@@ -795,7 +857,7 @@
 .primary-toggle input{accent-color:#1a472a;width:14px;height:14px;}
 .notes-input{resize:vertical;font-size:13px !important;direction:rtl;line-height:1.6;}
 
-/* ── Status bar ─────────────────────────────────────────────────────────────── */
+/* Status */
 .status-bar{padding:8px 14px;font-size:12px;flex-shrink:0;}
 .status-success{background:#d4edda;color:#155724;}
 .status-error  {background:#f8d7da;color:#721c24;}
