@@ -350,17 +350,6 @@
 
       <!-- ── Action bar ────────────────────────────────────────────────────────── -->
       <div class="action-bar">
-        <div class="action-left">
-          {#if mode==='view'}
-            <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
-            <button class="abtn edit"   onclick={startEdit}>Edit</button>
-            <button class="abtn new"    onclick={startNew}>New +</button>
-          {:else}
-            <button class="abtn save"   onclick={saveAnalysis}>Save</button>
-            <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
-          {/if}
-        </div>
-
         <!-- Analysis pills: background = certainty colour, ring = active -->
         <div class="a-pills">
           {#each analyses as a, i}
@@ -370,9 +359,20 @@
               class:pill-c3={a.certainty===3}
               class:pill-active={i===selIdx}
               onclick={()=>switchAnalysis(i)}>
-              ({a.pos_code||'?'}){a.is_primary?'★':''}{i+1}
+              {i+1}{a.is_primary?'*':''}({a.pos_code||'?'})
             </button>
           {/each}
+        </div>
+
+        <div class="action-right">
+          {#if mode==='view'}
+            <button class="abtn new"    onclick={startNew}>New +</button>
+            <button class="abtn edit"   onclick={startEdit}>Edit</button>
+            <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
+          {:else}
+            <button class="abtn save"   onclick={saveAnalysis}>Save</button>
+            <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
+          {/if}
         </div>
       </div>
 
@@ -466,7 +466,9 @@
                 <button class="add-cancel" onclick={()=>{addingLemma=false;newLemmaText=''}}>✕</button>
               </div>
             {:else}
-              <button class="list-add" onclick={()=>addingLemma=true}>+ Add Lemma</button>
+              <div class="list-add-row">
+                <button class="list-add-icon" onclick={()=>addingLemma=true} title="Add Lemma">+</button>
+              </div>
             {/if}
           </div>
 
@@ -499,7 +501,9 @@
                   <button class="add-cancel" onclick={()=>{addingPattern=false;newPatText=''}}>✕</button>
                 </div>
               {:else}
-                <button class="list-add" onclick={()=>addingPattern=true}>+ Add Pattern</button>
+                <div class="list-add-row">
+                  <button class="list-add-icon" onclick={()=>addingPattern=true} title="Add Pattern">+</button>
+                </div>
               {/if}
             </div>
           {/if}
@@ -769,7 +773,7 @@
 
 /* Action bar */
 .action-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #e8e8e8;flex-shrink:0;background:#fafafa;gap:8px;}
-.action-left{display:flex;gap:5px;}
+.action-right{display:flex;gap:5px;flex-shrink:0;}
 .abtn{border:none;border-radius:4px;padding:5px 13px;cursor:pointer;font-size:12px;font-weight:500;}
 .abtn.edit  {background:#1a472a;color:white;}
 .abtn.danger{background:#e74c3c;color:white;}
@@ -826,8 +830,9 @@
 .add-cert{width:44px;border:1px solid #ddd;border-radius:4px;padding:4px;font-size:12px;}
 .add-ok{background:#1a472a;color:white;border:none;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:13px;}
 .add-cancel{background:none;border:1px solid #ddd;border-radius:4px;padding:5px 8px;cursor:pointer;font-size:13px;color:#888;}
-.list-add{background:none;border:1px dashed #2980b9;color:#2980b9;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px;margin-top:6px;width:100%;text-align:center;}
-.list-add:hover{background:#ebf5fb;}
+.list-add-row{display:flex;justify-content:flex-end;padding:2px 4px;}
+.list-add-icon{background:none;border:1px dashed #2980b9;color:#2980b9;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;line-height:1;padding:0;transition:all 0.15s;}
+.list-add-icon:hover{background:#2980b9;color:white;}
 
 /* Cert dots */
 .cert-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;}
