@@ -350,8 +350,20 @@
 
       <!-- ── Action bar ────────────────────────────────────────────────────────── -->
       <div class="action-bar">
-        <!-- Analysis pills: background = certainty colour, ring = active -->
-        <div class="a-pills">
+        <div class="action-left">
+          {#if mode==='view'}
+            <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
+            <button class="abtn edit"   onclick={startEdit}>Edit</button>
+          {:else}
+            <button class="abtn save"   onclick={saveAnalysis}>Save</button>
+            <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
+          {/if}
+        </div>
+
+        <div class="a-pills-wrap">
+          {#if mode==='view'}
+            <button class="new-pill-icon" onclick={startNew} title="New analysis">+</button>
+          {/if}
           {#each analyses as a, i}
             <button class="a-pill"
               class:pill-c1={a.certainty===1}
@@ -362,17 +374,6 @@
               {i+1}{a.is_primary?'*':''}({a.pos_code||'?'})
             </button>
           {/each}
-        </div>
-
-        <div class="action-right">
-          {#if mode==='view'}
-            <button class="abtn new"    onclick={startNew}>New +</button>
-            <button class="abtn edit"   onclick={startEdit}>Edit</button>
-            <button class="abtn danger" onclick={deleteAnalysis}>Delete</button>
-          {:else}
-            <button class="abtn save"   onclick={saveAnalysis}>Save</button>
-            <button class="abtn cancel" onclick={cancelEdit}>Cancel</button>
-          {/if}
         </div>
       </div>
 
@@ -773,34 +774,35 @@
 
 /* Action bar */
 .action-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #e8e8e8;flex-shrink:0;background:#fafafa;gap:8px;}
-.action-right{display:flex;gap:5px;flex-shrink:0;}
+.action-left{display:flex;gap:5px;flex-shrink:0;}
 .abtn{border:none;border-radius:4px;padding:5px 13px;cursor:pointer;font-size:12px;font-weight:500;}
 .abtn.edit  {background:#1a472a;color:white;}
 .abtn.danger{background:#e74c3c;color:white;}
-.abtn.new   {background:#2980b9;color:white;}
 .abtn.save  {background:#1a472a;color:white;}
 .abtn.cancel{background:#95a5a6;color:white;}
 
-/* Analysis pills */
-.a-pills{display:flex;gap:4px;flex-wrap:wrap;}
-.a-pill{display:flex;align-items:center;padding:4px 11px;border:2px solid transparent;border-radius:14px;cursor:pointer;font-size:12px;font-weight:600;color:white;transition:all 0.12s;}
+/* Analysis pills row */
+.a-pills-wrap{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.new-pill-icon{background:none;border:1.5px dashed #aaa;color:#aaa;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;line-height:1;padding:0;flex-shrink:0;transition:all 0.15s;}
+.new-pill-icon:hover{border-color:#2980b9;color:#2980b9;}
+.a-pill{display:flex;align-items:center;padding:4px 10px;border:2px solid transparent;border-radius:14px;cursor:pointer;font-size:12px;font-weight:600;color:white;transition:all 0.12s;}
 .a-pill.pill-c1{background:#43a047;}
 .a-pill.pill-c2{background:#fb8c00;}
 .a-pill.pill-c3{background:#e53935;}
 .a-pill.pill-active{outline:3px solid #1a472a;outline-offset:1px;}
 
 /* Body */
-.body-scroll{flex:1;overflow-y:auto;direction:ltr;}
+.body-scroll{flex:1;overflow-y:auto;direction:ltr;background:#f5f5f5;padding:10px;}
 
 /* ── VIEW MODE ── */
 /* Top rows (Morphological class, POS) */
-.top-row{display:flex;align-items:baseline;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #f5f5f5;}
+.top-row{display:flex;align-items:baseline;justify-content:space-between;padding:8px 12px;background:white;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
 .top-lbl{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.5px;}
 .top-val{font-size:14px;color:#222;font-weight:500;}
 .ar-inline{font-family:'Traditional Arabic',Arial,sans-serif;font-size:18px;direction:rtl;}
 
 /* Sections */
-.sec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
+.sec{background:white;border-radius:8px;padding:12px 14px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
 .sec-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
 .sec-hd span:first-child{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.6px;opacity:0.8;}
 .sec-hd-ar{font-size:11px;font-family:'Traditional Arabic',Arial,sans-serif;color:#1a472a;direction:rtl;font-weight:700;letter-spacing:0.4px;opacity:0.8;}
@@ -851,7 +853,7 @@
 .notes-text{font-size:13px;color:#555;direction:rtl;line-height:1.7;padding:6px 8px;background:#fafafa;border-radius:4px;border:1px solid #eee;}
 
 /* ── EDIT MODE ── */
-.esec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
+.esec{background:white;border-radius:8px;padding:12px 14px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,0.07);}
 .esec-hd{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;opacity:0.8;}
 .efield-row{display:flex;gap:8px;margin-bottom:8px;}
 .efield{display:flex;flex-direction:column;gap:3px;flex:1;}
