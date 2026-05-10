@@ -371,7 +371,7 @@
               class:pill-c3={a.certainty===3}
               class:pill-active={i===selIdx}
               onclick={()=>switchAnalysis(i)}>
-              {i+1}{a.is_primary?'*':''}({a.pos_code||'?'})
+              {i+1}{a.is_primary?'*':''}
             </button>
           {/each}
         </div>
@@ -412,12 +412,14 @@
                 <span class="kv-ar linkable" data-type="root">{d(fRoot)}</span>
               </div>
 
-              {#if fRootType}
               <div class="kv">
                 <span class="kv-lbl">Root Type</span>
-                <span class="kv-sub">{fRootType}</span>
+                {#if fRootType}
+                  <span class="kv-sub">{fRootType}</span>
+                {:else}
+                  <span class="kv-val">—</span>
+                {/if}
               </div>
-              {/if}
 
               <div class="kv">
                 <span class="kv-lbl">Verb Form</span>
@@ -782,14 +784,15 @@
 .abtn.cancel{background:#95a5a6;color:white;}
 
 /* Analysis pills row */
-.a-pills-wrap{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
-.new-pill-icon{background:none;border:1.5px dashed #aaa;color:#aaa;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;line-height:1;padding:0;flex-shrink:0;transition:all 0.15s;}
-.new-pill-icon:hover{border-color:#2980b9;color:#2980b9;}
-.a-pill{display:flex;align-items:center;padding:4px 10px;border:2px solid transparent;border-radius:14px;cursor:pointer;font-size:12px;font-weight:600;color:white;transition:all 0.12s;}
-.a-pill.pill-c1{background:#43a047;}
-.a-pill.pill-c2{background:#fb8c00;}
-.a-pill.pill-c3{background:#e53935;}
-.a-pill.pill-active{outline:3px solid #1a472a;outline-offset:1px;}
+.a-pills-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.new-pill-icon{background:white;border:1.5px dashed #bbb;color:#999;border-radius:7px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;line-height:1;padding:0;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.08);transition:all 0.15s;}
+.new-pill-icon:hover{border-color:#1a472a;color:#1a472a;box-shadow:0 2px 6px rgba(0,0,0,0.15);}
+.a-pill{display:flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 10px;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;color:white;letter-spacing:0.3px;box-shadow:0 2px 5px rgba(0,0,0,0.18);transition:all 0.15s;}
+.a-pill.pill-c1{background:linear-gradient(135deg,#43a047,#2e7d32);}
+.a-pill.pill-c2{background:linear-gradient(135deg,#fb8c00,#e65100);}
+.a-pill.pill-c3{background:linear-gradient(135deg,#e53935,#b71c1c);}
+.a-pill:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.22);}
+.a-pill.pill-active{outline:2px solid #1a472a;outline-offset:2px;box-shadow:0 3px 8px rgba(0,0,0,0.25);}
 
 /* Body */
 .body-scroll{flex:1;overflow-y:auto;direction:ltr;background:#f5f5f5;padding:10px;}
