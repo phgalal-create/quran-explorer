@@ -28,21 +28,16 @@
     activeTokenId = null;
     tokensByVerse = {};
     selectedAya = 1;
-    verses = await fetchAll('verse', {
-      select: 'id,verse,text_uthmani',
+    // Single query: fetch verses with tokens embedded (avoids long IN(...) URLs for big surahs)
+    const data = await fetchAll('verse', {
+      select: 'id,verse,text_uthmani,token(id,token_pos,text_uthmani)',
       surah: `eq.${selectedSurah}`,
       order: 'verse.asc'
     });
-    const verseIds = verses.map(v => v.id).join(',');
-    const tokens = await fetchAll('token', {
-      select: 'id,verse_id,token_pos,text_uthmani',
-      verse_id: `in.(${verseIds})`,
-      order: 'verse_id.asc,token_pos.asc'
-    });
+    verses = data.map(v => ({ id: v.id, verse: v.verse, text_uthmani: v.text_uthmani }));
     const byVerse = {};
-    tokens.forEach(t => {
-      if (!byVerse[t.verse_id]) byVerse[t.verse_id] = [];
-      byVerse[t.verse_id].push(t);
+    data.forEach(v => {
+      byVerse[v.id] = (v.token || []).sort((a, b) => a.token_pos - b.token_pos);
     });
     tokensByVerse = byVerse;
     loadingVerses = false;
