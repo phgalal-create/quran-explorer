@@ -301,15 +301,6 @@
 
     {#if selectedMorpheme}
 
-      <!-- ── Morpheme info ─────────────────────────────────────────────────── -->
-      <div class="m-info">
-        <span class="m-arabic">{selectedMorpheme.morpheme_u}</span>
-        <span class="m-sep">|</span>
-        <span class="m-meta">{selectedMorpheme.morpheme_s || '—'}</span>
-        <span class="m-sep">|</span>
-        <span class="m-meta">Morpheme #{selectedMorpheme.morpheme_pos} &nbsp; ID: {selectedMorpheme.id}</span>
-      </div>
-
       <!-- ── Analysis tabs + action buttons ──────────────────────────────── -->
       <div class="a-row">
         <div class="a-tabs">
@@ -698,12 +689,6 @@
 .morpheme-tabs{display:flex;border-bottom:2px solid #eee;overflow-x:auto;flex-shrink:0;direction:rtl;}
 .m-tab{padding:10px 18px;border:none;background:none;cursor:pointer;font-size:21px;font-family:'Traditional Arabic',Arial,sans-serif;border-bottom:3px solid transparent;color:#555;white-space:nowrap;transition:background 0.1s;}
 .m-tab:hover{background:#f5f5f5;}.m-tab.active{border-bottom-color:#1a472a;color:#1a472a;font-weight:bold;}
-
-/* Morpheme info */
-.m-info{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f8f8f8;border-bottom:1px solid #eee;flex-shrink:0;flex-wrap:wrap;direction:rtl;}
-.m-arabic{font-size:24px;font-family:'Traditional Arabic',Arial,sans-serif;color:#1a472a;}
-.m-sep{color:#ddd;font-size:14px;}
-.m-meta{font-size:12px;color:#888;}
 
 /* Analysis row */
 .a-row{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #eee;flex-shrink:0;gap:6px;flex-wrap:wrap;}
