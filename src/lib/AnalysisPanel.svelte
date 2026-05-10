@@ -361,13 +361,16 @@
           {/if}
         </div>
 
-        <!-- Analysis tabs: each is a pill; active one shows certainty -->
+        <!-- Analysis pills: background = certainty colour, ring = active -->
         <div class="a-pills">
           {#each analyses as a, i}
-            <button class="a-pill" class:active={i===selIdx}
+            <button class="a-pill"
+              class:pill-c1={a.certainty===1}
+              class:pill-c2={a.certainty===2}
+              class:pill-c3={a.certainty===3}
+              class:pill-active={i===selIdx}
               onclick={()=>switchAnalysis(i)}>
-              ({a.pos_code||'?'}) {a.is_primary?'★':''}{i+1}
-              {#if i===selIdx}<span class="pill-cert">{certLbl(fCert)}</span>{/if}
+              ({a.pos_code||'?'}){a.is_primary?'★':''}{i+1}
             </button>
           {/each}
         </div>
@@ -387,7 +390,7 @@
 
           <!-- POS -->
           <div class="top-row">
-            <span class="top-lbl">POS</span>
+            <span class="top-lbl">Part of Speech</span>
             <span class="top-val">
               {#if currentPOS}
                 {currentPOS.meaning} — <span class="ar-inline">{currentPOS.arabic}</span>
@@ -405,11 +408,15 @@
 
               <div class="kv">
                 <span class="kv-lbl">Root جذر</span>
-                <span class="kv-right">
-                  <span class="kv-ar linkable" data-type="root">{d(fRoot)}</span>
-                  {#if fRootType}<span class="kv-sub">{fRootType}</span>{/if}
-                </span>
+                <span class="kv-ar linkable" data-type="root">{d(fRoot)}</span>
               </div>
+
+              {#if fRootType}
+              <div class="kv">
+                <span class="kv-lbl">Root Type</span>
+                <span class="kv-sub">{fRootType}</span>
+              </div>
+              {/if}
 
               <div class="kv">
                 <span class="kv-lbl">Verb Form</span>
@@ -432,6 +439,37 @@
             </div>
           {/if}
 
+          <!-- LEMMA (separate section) -->
+          <div class="sec">
+            <div class="sec-hd">
+              <span>Lemma</span>
+            </div>
+
+            {#each lemmaRows as row}
+              <div class="list-row">
+                <span class="list-rank">{row.rank}</span>
+                <span class="list-ar linkable" data-type="lemma">{row.text||'—'}</span>
+                {#if row.lemmaType}<span class="list-type">{row.lemmaType}</span>{/if}
+                <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
+                <button class="list-del" onclick={()=>viewDeleteLemma(row.alId)} title="Remove">✕</button>
+              </div>
+            {/each}
+
+            {#if addingLemma}
+              <div class="add-inline">
+                <input class="add-ar-input" bind:value={newLemmaText}
+                  placeholder="عَالِم" dir="rtl" autofocus>
+                <select bind:value={newLemmaCert} class="add-cert">
+                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
+                </select>
+                <button class="add-ok"  onclick={viewAddLemma}>✓</button>
+                <button class="add-cancel" onclick={()=>{addingLemma=false;newLemmaText=''}}>✕</button>
+              </div>
+            {:else}
+              <button class="list-add" onclick={()=>addingLemma=true}>+ Add Lemma</button>
+            {/if}
+          </div>
+
           <!-- PATTERN (separate section) -->
           {#if showVN}
             <div class="sec">
@@ -444,7 +482,7 @@
                 <div class="list-row">
                   <span class="list-rank">{row.rank}</span>
                   <span class="list-ar linkable" data-type="pattern">{row.text||'—'}</span>
-                  <span class="list-type">{row.patternType||''}</span>
+                  {#if row.patternType}<span class="list-type">{row.patternType}</span>{/if}
                   <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
                   <button class="list-del" onclick={()=>viewDeletePattern(row.apId)} title="Remove">✕</button>
                 </div>
@@ -465,38 +503,6 @@
               {/if}
             </div>
           {/if}
-
-          <!-- LEMMA (separate section) -->
-          <div class="sec">
-            <div class="sec-hd">
-              <span>Lexeme</span>
-              <span class="sec-hd-ar">المعجم</span>
-            </div>
-
-            {#each lemmaRows as row}
-              <div class="list-row">
-                <span class="list-rank">{row.rank}</span>
-                <span class="list-ar linkable" data-type="lemma">{row.text||'—'}</span>
-                <span class="list-type">{row.lemmaType||''}</span>
-                <span class="cert-dot {certClass(row.certainty)}" title={certLbl(row.certainty)}></span>
-                <button class="list-del" onclick={()=>viewDeleteLemma(row.alId)} title="Remove">✕</button>
-              </div>
-            {/each}
-
-            {#if addingLemma}
-              <div class="add-inline">
-                <input class="add-ar-input" bind:value={newLemmaText}
-                  placeholder="عَالِم" dir="rtl" autofocus>
-                <select bind:value={newLemmaCert} class="add-cert">
-                  <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
-                </select>
-                <button class="add-ok"  onclick={viewAddLemma}>✓</button>
-                <button class="add-cancel" onclick={()=>{addingLemma=false;newLemmaText=''}}>✕</button>
-              </div>
-            {:else}
-              <button class="list-add" onclick={()=>addingLemma=true}>+ Add Lemma</button>
-            {/if}
-          </div>
 
           <!-- GRAMMATICAL FEATURES -->
           {#if showVN || fSp}
@@ -628,21 +634,6 @@
                 {/if}
               </div>
             </div>
-
-            <div class="esec">
-              <div class="esec-hd">Pattern وزن</div>
-              {#each patternRows as row, i}
-                <div class="sub-row">
-                  <span class="sub-rank">{i+1}.</span>
-                  <input class="ar-input sub-inp" bind:value={row.text} placeholder="فَعَلَ" dir="rtl">
-                  <select bind:value={row.certainty} class="cert-sel">
-                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
-                  </select>
-                  <button class="btn-x" onclick={()=>removePatternEdit(i)}>✕</button>
-                </div>
-              {/each}
-              <button class="btn-add" onclick={()=>patternRows=[...patternRows,{text:'',certainty:1,rank:patternRows.length+1}]}>+ Pattern</button>
-            </div>
           {/if}
 
           <div class="esec">
@@ -659,6 +650,23 @@
             {/each}
             <button class="btn-add" onclick={()=>lemmaRows=[...lemmaRows,{text:'',certainty:1,rank:lemmaRows.length+1}]}>+ Lemma</button>
           </div>
+
+          {#if showVN}
+            <div class="esec">
+              <div class="esec-hd">Pattern وزن</div>
+              {#each patternRows as row, i}
+                <div class="sub-row">
+                  <span class="sub-rank">{i+1}.</span>
+                  <input class="ar-input sub-inp" bind:value={row.text} placeholder="فَعَلَ" dir="rtl">
+                  <select bind:value={row.certainty} class="cert-sel">
+                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
+                  </select>
+                  <button class="btn-x" onclick={()=>removePatternEdit(i)}>✕</button>
+                </div>
+              {/each}
+              <button class="btn-add" onclick={()=>patternRows=[...patternRows,{text:'',certainty:1,rank:patternRows.length+1}]}>+ Pattern</button>
+            </div>
+          {/if}
 
           <div class="esec">
             <div class="esec-hd">Grammatical Features</div>
@@ -771,10 +779,11 @@
 
 /* Analysis pills */
 .a-pills{display:flex;gap:4px;flex-wrap:wrap;}
-.a-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #ccc;border-radius:14px;background:white;cursor:pointer;font-size:12px;transition:all 0.12s;}
-.a-pill:hover{border-color:#1a472a;}
-.a-pill.active{background:#1a472a;color:white;border-color:#1a472a;}
-.pill-cert{font-size:10px;opacity:0.85;border-left:1px solid rgba(255,255,255,0.4);padding-left:5px;margin-left:2px;}
+.a-pill{display:flex;align-items:center;padding:4px 11px;border:2px solid transparent;border-radius:14px;cursor:pointer;font-size:12px;font-weight:600;color:white;transition:all 0.12s;}
+.a-pill.pill-c1{background:#43a047;}
+.a-pill.pill-c2{background:#fb8c00;}
+.a-pill.pill-c3{background:#e53935;}
+.a-pill.pill-active{outline:3px solid #1a472a;outline-offset:1px;}
 
 /* Body */
 .body-scroll{flex:1;overflow-y:auto;direction:ltr;}
@@ -790,7 +799,7 @@
 .sec{padding:10px 14px;border-bottom:1px solid #f0f0f0;}
 .sec-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
 .sec-hd span:first-child{font-size:11px;font-weight:700;color:#1a472a;text-transform:uppercase;letter-spacing:0.6px;opacity:0.8;}
-.sec-hd-ar{font-size:14px;font-family:'Traditional Arabic',Arial,sans-serif;color:#aaa;direction:rtl;}
+.sec-hd-ar{font-size:11px;font-family:'Traditional Arabic',Arial,sans-serif;color:#1a472a;direction:rtl;font-weight:700;letter-spacing:0.4px;opacity:0.8;}
 
 /* Key-value rows */
 .kv{display:flex;align-items:center;justify-content:space-between;padding:4px 0;min-height:28px;}
